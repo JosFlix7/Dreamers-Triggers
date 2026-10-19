@@ -6,7 +6,10 @@ import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.kyori.adventure.title.Title;
+import net.kyori.adventure.translation.GlobalTranslator;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Player;
@@ -21,6 +24,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -90,6 +94,12 @@ final class DreamersListener implements Listener {
                 .build();
         player.getServer().sendMessage(message);
         player.playSound(TOTEM_SOUND, Sound.Emitter.self());
+        Bukkit.getPluginManager().callEvent(new PlayerTotemAlertEvent(player, plain(message)));
+    }
+
+    private static String plain(Component component) {
+        Component rendered = GlobalTranslator.render(component, Locale.forLanguageTag("es-ES"));
+        return PlainTextComponentSerializer.plainText().serialize(rendered);
     }
 
     @EventHandler

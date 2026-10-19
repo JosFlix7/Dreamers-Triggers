@@ -43,4 +43,4 @@ Hace falta JDK 25. Gradle descarga esa versión si el sistema usa otra.
 .\gradlew.bat build
 ```
 
-El jar queda en `build/libs/Dreamers-Triggers-1.0.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3.
+El jar queda en `build/libs/Dreamers-Triggers-1.1.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3.
