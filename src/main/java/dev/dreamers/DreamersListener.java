@@ -1,0 +1,114 @@
+package dev.dreamers;
+
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.sound.Sound;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Material;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityResurrectEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+
+import java.time.Duration;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+final class DreamersListener implements Listener {
+    private static final Sound DEATH_SOUND = Sound.sound(
+            Key.key("minecraft", "terranova.death"),
+            Sound.Source.AMBIENT,
+            1f,
+            1f
+    );
+    private static final Sound TOTEM_SOUND = Sound.sound(
+            Key.key("minecraft", "terranova.totem"),
+            Sound.Source.PLAYER,
+            1f,
+            1f
+    );
+    private static final Title.Times TITLE_TIMES = Title.Times.times(
+            Duration.ofMillis(500),
+            Duration.ofMillis(3500),
+            Duration.ofMillis(1000)
+    );
+
+    private final Map<UUID, DamageSource> lastDamage = new ConcurrentHashMap<>();
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            lastDamage.put(player.getUniqueId(), event.getDamageSource());
+        }
+    }
+
+    @EventHandler
+    public void onDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
+        lastDamage.remove(player.getUniqueId());
+
+        Component subtitle = event.deathMessage() == null ? Component.empty() : event.deathMessage();
+        Title title = Title.title(
+                Component.text("Fallen Player", NamedTextColor.RED),
+                subtitle,
+                TITLE_TIMES
+        );
+        for (Player online : player.getServer().getOnlinePlayers()) {
+            online.showTitle(title);
+            online.playSound(DEATH_SOUND, Sound.Emitter.self());
+        }
+    }
+
+    @EventHandler
+    public void onResurrect(EntityResurrectEvent event) {
+        if (!(event.getEntity() instanceof Player player) || event.isCancelled()) {
+            return;
+        }
+        EquipmentSlot hand = event.getHand();
+        if (hand == null) {
+            return;
+        }
+
+        Component message = Component.text()
+                .append(player.displayName().color(NamedTextColor.YELLOW).decorate(TextDecoration.BOLD))
+                .append(totemAction(player, hand))
+                .append(Component.space())
+                .append(Component.text("(", NamedTextColor.YELLOW))
+                .append(TotemCauses.describe(lastDamage.remove(player.getUniqueId())))
+                .append(Component.text(")", NamedTextColor.YELLOW))
+                .build();
+        player.getServer().sendMessage(message);
+        player.playSound(TOTEM_SOUND, Sound.Emitter.self());
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        lastDamage.remove(event.getPlayer().getUniqueId());
+    }
+
+    private static Component totemAction(Player player, EquipmentSlot hand) {
+        ItemStack totem = player.getEquipment() == null
+                ? ItemStack.empty()
+                : player.getEquipment().getItem(hand);
+        Component customName = totem.getType() == Material.TOTEM_OF_UNDYING
+                ? totem.getData(DataComponentTypes.CUSTOM_NAME)
+                : null;
+        if (customName == null) {
+            return Component.text(" toteó pótem!", NamedTextColor.YELLOW);
+        }
+        return Component.text(" consumió ", NamedTextColor.YELLOW)
+                .append(customName)
+                .append(Component.text("!", NamedTextColor.YELLOW));
+    }
+}

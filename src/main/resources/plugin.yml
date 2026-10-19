@@ -1,0 +1,6 @@
+name: Dreamers Triggers
+version: '1.0'
+author: JosFlix7
+main: dev.dreamers.DreamersPlugin
+api-version: '26.3'
+description: Dreamers Triggers
