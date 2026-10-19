@@ -1,5 +1,5 @@
-name: Dreamers Triggers
-version: '1.0'
+name: DreamersTriggers
+version: '1.1'
 author: JosFlix7
 main: dev.dreamers.DreamersPlugin
 api-version: '26.3'
