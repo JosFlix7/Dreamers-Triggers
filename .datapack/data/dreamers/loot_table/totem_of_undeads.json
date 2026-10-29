@@ -1,0 +1,33 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:totem_of_undying",
+          "functions": [
+            {
+              "function": "minecraft:set_components",
+              "components": {
+                "minecraft:custom_name": {
+                  "text": "Tótem de los no-muertos",
+                  "color": "dark_purple",
+                  "italic": false
+                },
+                "minecraft:lore": [
+                  {
+                    "text": "Tótem que usan los no muertos para vengarse de tí, usarlo a tu favor te traerá consecuencias...",
+                    "color": "white",
+                    "italic": false
+                  }
+                ],
+                "minecraft:item_model": "dreamers:totem_of_undeads"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

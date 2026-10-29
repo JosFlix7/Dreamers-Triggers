@@ -1,6 +1,7 @@
 {
   "pack": {
-    "pack_format": 121,
-    "description": "Dreamers Triggers!"
+    "description": "Datapack complementario para el plugin Dreamers Triggers",
+    "min_format": [121, 0],
+    "max_format": 121
   }
 }

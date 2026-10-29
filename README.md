@@ -2,7 +2,7 @@
 
 Plugin de Paper para Minecraft 26.3. Avisa a todo el servidor cuando un jugador muere o cuando un tótem de la resurrección lo salva.
 
-La carpeta `.datapack` guarda la versión anterior, hecha como datapack. No la cargues junto con el plugin: los dos anunciarían la misma muerte y el mismo tótem.
+`.datapack` es el datapack que mete los tótems en el creativo. Cárgalo junto con el plugin. `.datapack_old` es la versión anterior: no la cargues, porque anunciaría otra vez la muerte y el tótem.
 
 ## Muerte
 
@@ -13,7 +13,9 @@ Cuando un jugador muere, todos ven un título:
 
 El mensaje de chat de la muerte no se quita. El título se suma a ese aviso.
 
-Al mismo tiempo suena `minecraft:terranova.death` para todos los jugadores conectados. El sonido va en la categoría de ambiente y se reproduce en cada jugador, así que no se oye desde el lugar donde murió alguien.
+Al mismo tiempo suena `dreamers:dreamers.effect_fortnite` para todos los jugadores conectados. El sonido va en la categoría de ambiente y se reproduce en cada jugador, así que no se oye desde el lugar donde murió alguien.
+
+Cuando ese jugador reaparece, solo él oye `dreamers:dreamers.effect_rbd`. Volver del End no lo dispara.
 
 ## Tótem
 
@@ -24,14 +26,28 @@ Si un tótem evita la muerte, el chat muestra un mensaje amarillo con el nombre 
 
 El texto entre paréntesis es la causa del golpe que activó el tótem. Si hubo un atacante, el mensaje lo incluye, como en `Detonado(a) por Creeper` o `Flecha de Esqueleto`. El nombre que puso el jugador en el yunque conserva su formato.
 
-El sonido `minecraft:terranova.totem` solo lo oye quien consumió el tótem.
+El sonido `dreamers:dreamers.effect_bell` solo lo oye quien consumió un tótem normal, aunque esté renombrado en el yunque. Las variantes usan otro sonido:
+
+- **Nutritótem:** el sonido vanilla del tótem. Durante 2 segundos da resistencia que anula el daño y, además, los efectos normales del tótem. En supervivencia solo se craftea, con un tótem normal en el centro: lapislázuli, pólvora y lapislázuli arriba; redstone a los lados; lapislázuli, pólvora y redstone abajo.
+- **Tótem de los no-muertos:** el sonido vanilla del tótem, más grave (tono 0.75). En un mob no-muerto se porta como un tótem y, durante 1 segundo, aplica Wither I por 3 segundos en un área de 3×3 a su alrededor. Si lo usa un jugador, queda a 1 de vida, con Wither I (45 s), Debilidad II (40 s), Fatiga minera I (15 s) y la saturación al máximo. Las variantes de zombi y de esqueleto tienen un 15% de aparecer con uno en la otra mano y un 5% de soltar uno al morir. En supervivencia ese drop es la única forma de conseguirlo.
+- **Tótem Dreamer:** `dreamers:dreamers.totem`. Sigue popeando desde el inventario. En supervivencia solo se craftea, con un tótem normal en el centro: diamante, fragmento de amatista y diamante arriba y abajo; tótem, ojo de ender y tótem en medio.
+
+El tótem normal se consigue como siempre. Los tres tótems custom salen en el creativo de Java junto a los libros encantados, con la textura del tótem. Al tomarlos, el datapack `.datapack` los cambia al momento por un tótem de la resurrección. Hay que cargar ese datapack junto con el plugin. En Bedrock, Geyser los muestra en la categoría de equipo.
+
+## Modo UHC por muerte
+
+`/dreamers DeathUCH on` lo deja pendiente. `/dreamers DeathUCH off` lo apaga y el juego sigue como siempre. `/dreamers DeathUCH time <segundos>` define cuánto dura; si no se cambia, son 60 segundos.
+
+Con el modo activado, la muerte de un jugador apaga la regeneración natural durante ese tiempo. Si muere otro mientras sigue corriendo, se suma otra vez la misma duración al tiempo que queda. Todos ven una boss bar roja, `Modo UHC por muerte de un jugador`, que se vacía según el tiempo restante. Al llegar a cero, la regeneración vuelve a como estaba.
 
 ## Resource pack
 
-Los dos sonidos no están dentro del plugin. Salen del resource pack Terranova, con estos eventos:
+Los sonidos no están dentro del plugin. Salen del resource pack, en el namespace `dreamers`:
 
-- `minecraft:terranova.death`
-- `minecraft:terranova.totem`
+- `dreamers:dreamers.effect_fortnite`
+- `dreamers:dreamers.effect_bell`
+- `dreamers:dreamers.effect_rbd`
+- `dreamers:dreamers.totem`
 
 Sin ese pack, el título y el chat funcionan igual y el sonido no se oye.
 
@@ -43,4 +59,4 @@ Hace falta JDK 25. Gradle descarga esa versión si el sistema usa otra.
 .\gradlew.bat build
 ```
 
-El jar queda en `build/libs/Dreamers-Triggers-1.1.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3.
+El jar queda en `build/libs/Dreamers-Triggers-1.3.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3.

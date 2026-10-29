@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "dev.dreamers"
-version = "1.2"
+version = "1.3"
 
 repositories {
     maven(url = "https://repo.papermc.io/repository/maven-public/") {
