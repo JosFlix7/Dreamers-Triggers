@@ -1,7 +1,13 @@
 package dev.dreamers;
 
+import io.papermc.paper.datacomponent.DataComponentType;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ItemLore;
+import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -18,6 +24,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDropItemEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.ClickType;
@@ -25,8 +33,10 @@ import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -267,6 +277,43 @@ final class BundleSack implements Listener {
     }
 
     @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        refreshVisible(event.getPlayer().getInventory());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player) || open.containsKey(player.getUniqueId())) {
+            return;
+        }
+        refreshVisible(event.getInventory());
+        refreshVisible(player.getInventory());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                refreshVisible(player.getInventory());
+            }
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onContainerDrop(EntityDropItemEvent event) {
+        if (!(event.getEntity() instanceof Item entity)) {
+            return;
+        }
+        ItemStack stack = entity.getItemStack();
+        if (isBundle(stack) && stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onItemRemove(EntityRemoveEvent event) {
         EntityRemoveEvent.Cause cause = event.getCause();
         if (cause != EntityRemoveEvent.Cause.DEATH
@@ -296,6 +343,117 @@ final class BundleSack implements Listener {
             location.setY(Math.max(location.getY(), entity.getWorld().getMinHeight()));
         }
         spill(location, loose);
+    }
+
+    private void refreshVisible(Inventory inventory) {
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (stack != null && updatePreview(stack)) {
+                inventory.setItem(slot, stack);
+            }
+        }
+    }
+
+    private boolean updatePreview(ItemStack stack) {
+        if (!isBundle(stack) || !stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
+            return false;
+        }
+        ItemStack[] stored = new ItemStack[9];
+        read(stack, stored, new ArrayList<>());
+        List<ItemStack> items = new ArrayList<>();
+        for (ItemStack content : stored) {
+            if (content != null && !content.getType().isAir()) {
+                items.add(content);
+            }
+        }
+        if (previewMatches(stack, items)) {
+            return false;
+        }
+        applyPreview(stack, items);
+        return true;
+    }
+
+    private void applyPreview(ItemStack stack, List<ItemStack> items) {
+        stack.unsetData(DataComponentTypes.CONTAINER);
+        if (items.isEmpty()) {
+            stack.unsetData(DataComponentTypes.LORE);
+            revealBundleTooltip(stack);
+            return;
+        }
+        ItemLore.Builder lore = ItemLore.lore();
+        for (ItemStack item : items) {
+            lore.addLine(loreLine(item));
+        }
+        stack.setData(DataComponentTypes.LORE, lore);
+        hideBundleTooltip(stack);
+    }
+
+    private boolean previewMatches(ItemStack stack, List<ItemStack> items) {
+        boolean hidden = bundleTooltipHidden(stack);
+        boolean hasContainer = stack.getData(DataComponentTypes.CONTAINER) != null;
+        ItemLore lore = stack.getData(DataComponentTypes.LORE);
+        if (items.isEmpty()) {
+            return !hasContainer && lore == null && !hidden;
+        }
+        if (!hidden || hasContainer || lore == null || lore.lines().size() != items.size()) {
+            return false;
+        }
+        List<Component> lines = lore.lines();
+        for (int index = 0; index < items.size(); index++) {
+            if (!plain(lines.get(index)).equals(plain(loreLine(items.get(index))))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Component loreLine(ItemStack item) {
+        Component line = item.displayName();
+        if (item.getAmount() > 1) {
+            line = line.append(Component.text(" x" + item.getAmount()));
+        }
+        return line.colorIfAbsent(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false);
+    }
+
+    private static String plain(Component component) {
+        return PlainTextComponentSerializer.plainText().serialize(component);
+    }
+
+    private void hideBundleTooltip(ItemStack stack) {
+        TooltipDisplay current = stack.getData(DataComponentTypes.TOOLTIP_DISPLAY);
+        Set<DataComponentType> hidden = new HashSet<>();
+        boolean hideAll = false;
+        if (current != null) {
+            hideAll = current.hideTooltip();
+            hidden.addAll(current.hiddenComponents());
+        }
+        hidden.add(DataComponentTypes.BUNDLE_CONTENTS);
+        stack.setData(
+                DataComponentTypes.TOOLTIP_DISPLAY,
+                TooltipDisplay.tooltipDisplay().hideTooltip(hideAll).hiddenComponents(hidden)
+        );
+    }
+
+    private void revealBundleTooltip(ItemStack stack) {
+        TooltipDisplay current = stack.getData(DataComponentTypes.TOOLTIP_DISPLAY);
+        if (current == null || !current.hiddenComponents().contains(DataComponentTypes.BUNDLE_CONTENTS)) {
+            return;
+        }
+        Set<DataComponentType> hidden = new HashSet<>(current.hiddenComponents());
+        hidden.remove(DataComponentTypes.BUNDLE_CONTENTS);
+        if (hidden.isEmpty() && !current.hideTooltip()) {
+            stack.unsetData(DataComponentTypes.TOOLTIP_DISPLAY);
+            return;
+        }
+        stack.setData(
+                DataComponentTypes.TOOLTIP_DISPLAY,
+                TooltipDisplay.tooltipDisplay().hideTooltip(current.hideTooltip()).hiddenComponents(hidden)
+        );
+    }
+
+    private static boolean bundleTooltipHidden(ItemStack stack) {
+        TooltipDisplay display = stack.getData(DataComponentTypes.TOOLTIP_DISPLAY);
+        return display != null && display.hiddenComponents().contains(DataComponentTypes.BUNDLE_CONTENTS);
     }
 
     private void show(Player player, int slot, UUID id) {
@@ -514,6 +672,9 @@ final class BundleSack implements Listener {
             }
             meta.setItems(null);
         });
+        if (stored) {
+            applyPreview(stack, items);
+        }
         return stored;
     }
 

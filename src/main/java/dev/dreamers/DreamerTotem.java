@@ -58,15 +58,14 @@ final class DreamerTotem {
         dreamerMark = new NamespacedKey(plugin, "dreamer_totem");
         typeMark = new NamespacedKey(plugin, "totem_type");
         recipe = new NamespacedKey(plugin, "dreamer_totem");
-        if (Bukkit.getRecipe(recipe) == null) {
-            ShapedRecipe shaped = new ShapedRecipe(recipe, dreamer());
-            shaped.shape("DAD", "TET", "DAD");
-            shaped.setIngredient('D', Material.DIAMOND);
-            shaped.setIngredient('A', Material.AMETHYST_SHARD);
-            shaped.setIngredient('E', Material.ENDER_EYE);
-            shaped.setIngredient('T', plainTotem());
-            Bukkit.addRecipe(shaped);
-        }
+        Bukkit.removeRecipe(recipe);
+        ShapedRecipe dreamerRecipe = new ShapedRecipe(recipe, dreamer());
+        dreamerRecipe.shape("DAD", "TET", "DAD");
+        dreamerRecipe.setIngredient('D', Material.DIAMOND);
+        dreamerRecipe.setIngredient('A', Material.AMETHYST_SHARD);
+        dreamerRecipe.setIngredient('E', Material.ENDER_EYE);
+        dreamerRecipe.setIngredient('T', nutriTotem());
+        Bukkit.addRecipe(dreamerRecipe);
         nutriRecipe = new NamespacedKey(plugin, "nutritotem");
         Bukkit.removeRecipe(nutriRecipe);
         ShapedRecipe shaped = new ShapedRecipe(nutriRecipe, nutri());

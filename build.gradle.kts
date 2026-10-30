@@ -5,7 +5,7 @@ plugins {
 defaultTasks("jar")
 
 group = "dev.dreamers"
-version = "1.4.1"
+version = "1.4.2"
 
 repositories {
     maven(url = "https://repo.papermc.io/repository/maven-public/") {
