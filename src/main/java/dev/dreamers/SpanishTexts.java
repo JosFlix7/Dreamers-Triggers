@@ -37,9 +37,8 @@ final class SpanishTexts {
                 return;
             }
             Map<String, MessageFormat> formats = new HashMap<>();
-            Matcher matcher = ENTRY.matcher(new String(input.readAllBytes(), StandardCharsets.UTF_8));
-            while (matcher.find()) {
-                formats.put(unescape(matcher.group(1)), messageFormat(unescape(matcher.group(2))));
+            for (Map.Entry<String, String> entry : entries(new String(input.readAllBytes(), StandardCharsets.UTF_8)).entrySet()) {
+                formats.put(entry.getKey(), messageFormat(entry.getValue()));
             }
             store = TranslationStore.messageFormat(NAME);
             store.registerAll(LOCALE, formats);
@@ -53,6 +52,41 @@ final class SpanishTexts {
         if (store != null) {
             GlobalTranslator.translator().removeSource(store);
             store = null;
+        }
+    }
+
+    static Map<String, String> entries(String json) {
+        Map<String, String> values = new HashMap<>();
+        Matcher matcher = ENTRY.matcher(json);
+        while (matcher.find()) {
+            values.put(unescape(matcher.group(1)), unescape(matcher.group(2)));
+        }
+        return values;
+    }
+
+    static String vanilla(String key, Object[] arguments) {
+        TranslationStore.StringBased<MessageFormat> current = store;
+        if (current == null) {
+            return null;
+        }
+        MessageFormat format = current.translate(key, LOCALE);
+        if (format == null) {
+            return null;
+        }
+        try {
+            synchronized (format) {
+                return format.format(arguments);
+            }
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    static String apply(String template, Object[] arguments) {
+        try {
+            return messageFormat(template).format(arguments);
+        } catch (IllegalArgumentException exception) {
+            return template;
         }
     }
 
@@ -98,7 +132,7 @@ final class SpanishTexts {
         return text.replace("%%", "%").replace("'", "''").replace("{", "'{'").replace("}", "'}'");
     }
 
-    private static String unescape(String value) {
+    static String unescape(String value) {
         StringBuilder builder = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char current = value.charAt(i);

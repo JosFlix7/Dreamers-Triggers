@@ -16,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
+import org.bukkit.SoundCategory;
 import org.bukkit.Statistic;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -74,12 +75,6 @@ final class DreamersListener implements Listener {
             Sound.Source.PLAYER,
             1f,
             1f
-    );
-    private static final Sound UNDEAD_SOUND = Sound.sound(
-            Key.key("minecraft", "item.totem.use"),
-            Sound.Source.PLAYER,
-            1f,
-            0.75f
     );
     private static final Title.Times TITLE_TIMES = Title.Times.times(
             Duration.ofMillis(500),
@@ -322,17 +317,28 @@ final class DreamersListener implements Listener {
             DreamerTotem.applyStandardEffects(entity);
         }
         totemParticles(entity);
+        if (kind == DreamerTotem.Kind.UNDEAD) {
+            playVanillaTotem(entity, 0.75f);
+        } else {
+            entity.getWorld().playSound(DREAMER_SOUND, entity.getLocation());
+        }
         if (entity instanceof Player player) {
             player.incrementStatistic(Statistic.USE_ITEM, Material.TOTEM_OF_UNDYING);
             announce(player, totem, source);
-            player.playSound(kind == DreamerTotem.Kind.UNDEAD ? UNDEAD_SOUND : DREAMER_SOUND, Sound.Emitter.self());
-        } else {
-            Sound sound = kind == DreamerTotem.Kind.UNDEAD ? UNDEAD_SOUND : DREAMER_SOUND;
-            entity.getWorld().playSound(sound, entity.getLocation());
         }
         if (kind == DreamerTotem.Kind.UNDEAD && isUndead(entity)) {
             witherAround(entity);
         }
+    }
+
+    private static void playVanillaTotem(LivingEntity entity, float pitch) {
+        entity.getWorld().playSound(
+                entity.getLocation(),
+                org.bukkit.Sound.ITEM_TOTEM_USE,
+                SoundCategory.PLAYERS,
+                1f,
+                pitch
+        );
     }
 
     private void witherAround(LivingEntity source) {

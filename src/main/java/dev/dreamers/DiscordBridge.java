@@ -6,7 +6,6 @@ import github.scarsz.discordsrv.api.events.AchievementMessagePreProcessEvent;
 import github.scarsz.discordsrv.api.events.DeathMessagePreProcessEvent;
 import github.scarsz.discordsrv.objects.MessageFormat;
 import io.papermc.paper.advancement.AdvancementDisplay;
-import net.kyori.adventure.text.Component;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 
@@ -43,8 +42,11 @@ final class DiscordBridge {
         if (display == null) {
             return;
         }
-        String title = text(display.title(), event.getAchievementName());
-        String description = SpanishTexts.plain(display.description());
+        String title = PackTexts.render(display.title());
+        if (title.isBlank()) {
+            title = event.getAchievementName();
+        }
+        String description = PackTexts.render(display.description());
         MessageFormat format = copy(event.getMessageFormat());
         String line = "**%username% " + action(display.frame()) + " " + markdown(title) + "!**";
         if (!description.isBlank()) {
@@ -61,11 +63,6 @@ final class DiscordBridge {
             case GOAL -> "ha alcanzado el objetivo";
             default -> "ha conseguido el progreso";
         };
-    }
-
-    private static String text(Component component, String fallback) {
-        String spanish = SpanishTexts.plain(component);
-        return spanish.isBlank() ? fallback : spanish;
     }
 
     private static String markdown(String text) {
