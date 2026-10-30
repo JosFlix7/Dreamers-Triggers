@@ -1,8 +1,9 @@
 name: DreamersTriggers
-version: '1.3'
+version: '1.4'
 author: JosFlix7
 main: dev.dreamers.DreamersPlugin
 api-version: '26.3'
+softdepend: [DiscordSRV]
 description: Dreamers Triggers
 commands:
   dreamers:

@@ -17,12 +17,27 @@
                 },
                 "minecraft:lore": [
                   {
-                    "text": "Popea en tu inventario sin necesidad de tenerlo en la segunda mano.",
+                    "text": "Popea en tu inventario sin necesidad de",
                     "color": "white",
                     "italic": false
                   },
                   {
-                    "text": "ADVERTENCIA: Se prioriza el tótem que tengas en tu mano principal o secundaria antes que este tótem",
+                    "text": "tenerlo en tu mano principal o secundaria.",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "ADVERTENCIA: El juego prioriza usar el",
+                    "color": "yellow",
+                    "italic": false
+                  },
+                  {
+                    "text": "tótem que tengas en tu mano principal o",
+                    "color": "yellow",
+                    "italic": false
+                  },
+                  {
+                    "text": "secundaria antes que este tótem",
                     "color": "yellow",
                     "italic": false
                   }

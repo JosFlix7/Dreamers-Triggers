@@ -1,3 +1,4 @@
 /.cursor
 .gradle/
 build/
+libs/

@@ -17,7 +17,12 @@
                 },
                 "minecraft:lore": [
                   {
-                    "text": "Otorga 2 segundos de resistencia infinita para poder escapar de la situación peligrosa.",
+                    "text": "Otorga 2 segundos de resistencia infinita",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "para poder escapar de la situación peligrosa.",
                     "color": "white",
                     "italic": false
                   }

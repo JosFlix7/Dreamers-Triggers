@@ -1,0 +1,92 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:totem_of_undying",
+          "functions": [
+            {
+              "function": "minecraft:set_components",
+              "components": {
+                "minecraft:custom_name": {
+                  "text": "Tótem Férreo",
+                  "color": "gray",
+                  "italic": false
+                },
+                "minecraft:lore": [
+                  {
+                    "text": "Otorga los mismos efectos que un",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "Nutritótem al popear.",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "Otorga dos corazones extras cuando",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "lo tienes en la mano secundaria",
+                    "color": "white",
+                    "italic": false
+                  }
+                ],
+                "minecraft:item_model": "dreamers:totem_ferreo",
+                "minecraft:attribute_modifiers": [
+                  {
+                    "type": "minecraft:max_health",
+                    "slot": "offhand",
+                    "id": "dreamers:totem_ferreo_health",
+                    "amount": 4,
+                    "operation": "add_value",
+                    "display": {
+                      "type": "hidden"
+                    }
+                  }
+                ],
+                "minecraft:death_protection": {
+                  "death_effects": [
+                    {
+                      "type": "minecraft:clear_all_effects"
+                    },
+                    {
+                      "type": "minecraft:apply_effects",
+                      "effects": [
+                        {
+                          "id": "minecraft:regeneration",
+                          "amplifier": 1,
+                          "duration": 900
+                        },
+                        {
+                          "id": "minecraft:absorption",
+                          "amplifier": 1,
+                          "duration": 100
+                        },
+                        {
+                          "id": "minecraft:fire_resistance",
+                          "amplifier": 0,
+                          "duration": 800
+                        },
+                        {
+                          "id": "minecraft:resistance",
+                          "amplifier": 4,
+                          "duration": 40
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,8 @@ import net.kyori.adventure.title.Title;
 import net.kyori.adventure.translation.GlobalTranslator;
 import io.papermc.paper.registry.keys.tags.EntityTypeTagKeys;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
@@ -38,8 +40,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.Map;
@@ -85,6 +89,7 @@ final class DreamersListener implements Listener {
 
     private final JavaPlugin plugin;
     private final Map<UUID, DamageSource> lastDamage = new ConcurrentHashMap<>();
+    private final Map<UUID, DeathView> deathViews = new HashMap<>();
 
     DreamersListener(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -106,7 +111,7 @@ final class DreamersListener implements Listener {
         Held held = heldTotem(entity);
         if (held != null) {
             DreamerTotem.Kind kind = DreamerTotem.kind(held.totem());
-            if (kind == DreamerTotem.Kind.PLAIN || kind == DreamerTotem.Kind.NUTRI) {
+            if (kind == DreamerTotem.Kind.PLAIN || kind == DreamerTotem.Kind.NUTRI || kind == DreamerTotem.Kind.FERREO) {
                 return;
             }
             event.setCancelled(true);
@@ -147,7 +152,11 @@ final class DreamersListener implements Listener {
         Player player = event.getEntity();
         lastDamage.remove(player.getUniqueId());
 
-        Component subtitle = event.deathMessage() == null ? Component.empty() : event.deathMessage();
+        Component deathMessage = event.deathMessage();
+        Component subtitle = deathMessage == null ? Component.empty() : paint(deathMessage, NamedTextColor.WHITE);
+        if (deathMessage != null) {
+            event.deathMessage(paint(deathMessage, NamedTextColor.RED));
+        }
         Title title = Title.title(
                 Component.text("Fallen Player", NamedTextColor.RED),
                 subtitle,
@@ -156,6 +165,10 @@ final class DreamersListener implements Listener {
         for (Player online : player.getServer().getOnlinePlayers()) {
             online.showTitle(title);
             online.playSound(DEATH_SOUND, Sound.Emitter.self());
+        }
+        if (player.getGameMode() != GameMode.SPECTATOR) {
+            cancelDeathView(player.getUniqueId());
+            deathViews.put(player.getUniqueId(), new DeathView(player.getLocation().clone(), player.getGameMode()));
         }
     }
 
@@ -173,7 +186,7 @@ final class DreamersListener implements Listener {
         announce(player, totem, lastDamage.remove(player.getUniqueId()));
         if (kind == DreamerTotem.Kind.PLAIN) {
             player.playSound(BELL_SOUND, Sound.Emitter.self());
-        } else if (kind == DreamerTotem.Kind.NUTRI) {
+        } else if (kind == DreamerTotem.Kind.NUTRI || kind == DreamerTotem.Kind.FERREO) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 4));
         }
     }
@@ -210,11 +223,18 @@ final class DreamersListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (player.isOnline()) {
-                player.playSound(RESPAWN_SOUND, Sound.Emitter.self());
-            }
-        });
+        DeathView view = deathViews.get(player.getUniqueId());
+        if (view == null) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (player.isOnline()) {
+                    player.playSound(RESPAWN_SOUND, Sound.Emitter.self());
+                }
+            });
+            return;
+        }
+        view.respawn = event.getRespawnLocation().clone();
+        event.setRespawnLocation(view.death.clone());
+        Bukkit.getScheduler().runTask(plugin, () -> holdDeathView(player, view));
     }
 
     @EventHandler
@@ -225,7 +245,67 @@ final class DreamersListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        lastDamage.remove(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        lastDamage.remove(player.getUniqueId());
+        DeathView view = deathViews.remove(player.getUniqueId());
+        if (view == null) {
+            return;
+        }
+        if (view.task != null) {
+            view.task.cancel();
+        }
+        player.setGameMode(view.mode);
+        if (view.respawn != null) {
+            player.teleport(view.respawn);
+        }
+    }
+
+    void shutdown() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            DeathView view = deathViews.remove(player.getUniqueId());
+            if (view == null) {
+                continue;
+            }
+            if (view.task != null) {
+                view.task.cancel();
+            }
+            player.setGameMode(view.mode);
+            if (view.respawn != null) {
+                player.teleport(view.respawn);
+            }
+        }
+        deathViews.clear();
+    }
+
+    private void holdDeathView(Player player, DeathView view) {
+        if (!player.isOnline() || deathViews.get(player.getUniqueId()) != view) {
+            return;
+        }
+        player.teleport(view.death);
+        player.setGameMode(GameMode.SPECTATOR);
+        Location death = view.death;
+        player.sendMessage(Component.text(
+                "Moriste en la ubicación: " + death.getBlockX() + ", " + death.getBlockY() + ", " + death.getBlockZ(),
+                NamedTextColor.YELLOW
+        ));
+        view.task = Bukkit.getScheduler().runTaskLater(plugin, () -> releaseDeathView(player, view), 60L);
+    }
+
+    private void releaseDeathView(Player player, DeathView view) {
+        if (deathViews.remove(player.getUniqueId(), view) && player.isOnline()) {
+            if (view.respawn != null) {
+                player.teleport(view.respawn);
+            }
+            player.setGameMode(view.mode);
+            player.playSound(RESPAWN_SOUND, Sound.Emitter.self());
+        }
+    }
+
+    private void cancelDeathView(UUID playerId) {
+        DeathView view = deathViews.remove(playerId);
+        if (view != null && view.task != null) {
+            view.task.cancel();
+        }
     }
 
     private void activate(LivingEntity entity, DreamerTotem.Kind kind, ItemStack totem, DamageSource source) {
@@ -300,20 +380,32 @@ final class DreamersListener implements Listener {
         Bukkit.getPluginManager().callEvent(new PlayerTotemAlertEvent(player, plain(message)));
     }
 
+    private static Component paint(Component component, NamedTextColor color) {
+        return component.children(component.children().stream().map(child -> paint(child, color)).toList()).color(color);
+    }
+
     private static String plain(Component component) {
         Component rendered = GlobalTranslator.render(component, Locale.forLanguageTag("es-ES"));
         return PlainTextComponentSerializer.plainText().serialize(rendered);
     }
 
     private static Component totemAction(ItemStack totem) {
-        Component customName = totem.getType() == Material.TOTEM_OF_UNDYING
-                ? totem.getData(DataComponentTypes.CUSTOM_NAME)
-                : null;
-        if (customName == null) {
+        DreamerTotem.Kind kind = DreamerTotem.kind(totem);
+        Component customName = totem.getData(DataComponentTypes.CUSTOM_NAME);
+        if (kind == DreamerTotem.Kind.PLAIN && customName == null) {
             return Component.text(" toteó pótem!", NamedTextColor.YELLOW);
         }
+        String name = customName == null
+                ? switch (kind) {
+                    case NUTRI -> "Nutritótem";
+                    case FERREO -> "Tótem Férreo";
+                    case DREAMER -> "Tótem Dreamer";
+                    case UNDEAD -> "Tótem de los no-muertos";
+                    default -> "Tótem";
+                }
+                : PlainTextComponentSerializer.plainText().serialize(customName);
         return Component.text(" consumió ", NamedTextColor.YELLOW)
-                .append(customName)
+                .append(Component.text(name, DreamerTotem.chatColor(kind)).decoration(TextDecoration.ITALIC, false))
                 .append(Component.text("!", NamedTextColor.YELLOW));
     }
 
@@ -372,4 +464,16 @@ final class DreamersListener implements Listener {
     }
 
     private record Held(EquipmentSlot slot, ItemStack totem) {}
+
+    private static final class DeathView {
+        private final Location death;
+        private final GameMode mode;
+        private Location respawn;
+        private BukkitTask task;
+
+        private DeathView(Location death, GameMode mode) {
+            this.death = death;
+            this.mode = mode;
+        }
+    }
 }

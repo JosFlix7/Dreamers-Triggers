@@ -17,7 +17,17 @@
                 },
                 "minecraft:lore": [
                   {
-                    "text": "Tótem que usan los no muertos para vengarse de tí, usarlo a tu favor te traerá consecuencias...",
+                    "text": "Tótem que usan los no muertos para",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "vengarse de tí, usarlo a tu favor te traerá",
+                    "color": "white",
+                    "italic": false
+                  },
+                  {
+                    "text": "consecuencias...",
                     "color": "white",
                     "italic": false
                   }

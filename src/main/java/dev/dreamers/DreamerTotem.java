@@ -2,7 +2,9 @@ package dev.dreamers;
 
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.DeathProtection;
+import io.papermc.paper.datacomponent.item.ItemAttributeModifiers;
 import io.papermc.paper.datacomponent.item.ItemLore;
+import io.papermc.paper.datacomponent.item.attribute.AttributeModifierDisplay;
 import io.papermc.paper.datacomponent.item.consumable.ConsumeEffect;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
@@ -12,8 +14,11 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
@@ -31,17 +36,21 @@ final class DreamerTotem {
         PLAIN,
         DREAMER,
         NUTRI,
+        FERREO,
         UNDEAD
     }
 
     private static final Key DREAMER_MODEL = Key.key("dreamers", "dreamers_totem");
     private static final Key NUTRI_MODEL = Key.key("dreamers", "nutritotem");
+    private static final Key FERREO_MODEL = Key.key("dreamers", "totem_ferreo");
     private static final Key UNDEAD_MODEL = Key.key("dreamers", "totem_of_undeads");
+    private static final NamespacedKey FERREO_HEALTH = new NamespacedKey("dreamers", "totem_ferreo_health");
 
     private static NamespacedKey dreamerMark;
     private static NamespacedKey typeMark;
     private static NamespacedKey recipe;
     private static NamespacedKey nutriRecipe;
+    private static NamespacedKey ferreoRecipe;
 
     private DreamerTotem() {}
 
@@ -59,15 +68,20 @@ final class DreamerTotem {
             Bukkit.addRecipe(shaped);
         }
         nutriRecipe = new NamespacedKey(plugin, "nutritotem");
-        if (Bukkit.getRecipe(nutriRecipe) == null) {
-            ShapedRecipe shaped = new ShapedRecipe(nutriRecipe, nutri());
-            shaped.shape("LPL", "RTR", "LPR");
-            shaped.setIngredient('L', Material.LAPIS_LAZULI);
-            shaped.setIngredient('P', Material.GUNPOWDER);
-            shaped.setIngredient('R', Material.REDSTONE);
-            shaped.setIngredient('T', plainTotem());
-            Bukkit.addRecipe(shaped);
-        }
+        Bukkit.removeRecipe(nutriRecipe);
+        ShapedRecipe shaped = new ShapedRecipe(nutriRecipe, nutri());
+        shaped.shape("DED", "ETE", "DED");
+        shaped.setIngredient('D', Material.DIAMOND);
+        shaped.setIngredient('E', Material.EMERALD);
+        shaped.setIngredient('T', plainTotem());
+        Bukkit.addRecipe(shaped);
+        ferreoRecipe = new NamespacedKey(plugin, "totem_ferreo");
+        Bukkit.removeRecipe(ferreoRecipe);
+        ShapedRecipe iron = new ShapedRecipe(ferreoRecipe, ferreo());
+        iron.shape("III", "INI", "III");
+        iron.setIngredient('I', Material.IRON_BLOCK);
+        iron.setIngredient('N', nutriTotem());
+        Bukkit.addRecipe(iron);
         for (Player player : Bukkit.getOnlinePlayers()) {
             discover(player);
             refreshCarried(player);
@@ -81,6 +95,9 @@ final class DreamerTotem {
         if (nutriRecipe != null) {
             player.discoverRecipe(nutriRecipe);
         }
+        if (ferreoRecipe != null) {
+            player.discoverRecipe(ferreoRecipe);
+        }
     }
 
     static ItemStack dreamer() {
@@ -88,10 +105,11 @@ final class DreamerTotem {
                 "Tótem Dreamer",
                 ItemRarity.EPIC.color(),
                 List.of(
-                        Component.text("Popea en tu inventario sin necesidad de tenerlo en la segunda mano.", NamedTextColor.WHITE)
-                                .decoration(TextDecoration.ITALIC, false),
-                        Component.text("ADVERTENCIA: Se prioriza el tótem que tengas en tu mano principal o secundaria antes que este tótem", NamedTextColor.YELLOW)
-                                .decoration(TextDecoration.ITALIC, false)
+                        line("Popea en tu inventario sin necesidad de"),
+                        line("tenerlo en tu mano principal o secundaria."),
+                        line("ADVERTENCIA: El juego prioriza usar el", NamedTextColor.YELLOW),
+                        line("tótem que tengas en tu mano principal o", NamedTextColor.YELLOW),
+                        line("secundaria antes que este tótem", NamedTextColor.YELLOW)
                 ),
                 DREAMER_MODEL
         );
@@ -105,19 +123,39 @@ final class DreamerTotem {
         ItemStack item = base(
                 "Nutritótem",
                 NamedTextColor.GREEN,
-                List.of(line("Otorga 2 segundos de resistencia infinita para poder escapar de la situación peligrosa.")),
+                List.of(
+                        line("Otorga 2 segundos de resistencia infinita"),
+                        line("para poder escapar de la situación peligrosa.")
+                ),
                 NUTRI_MODEL
         );
-        item.setData(DataComponentTypes.DEATH_PROTECTION, DeathProtection.deathProtection()
-                .addEffect(ConsumeEffect.clearAllStatusEffects())
-                .addEffect(ConsumeEffect.applyStatusEffects(List.of(
-                        new PotionEffect(PotionEffectType.REGENERATION, 900, 1),
-                        new PotionEffect(PotionEffectType.ABSORPTION, 100, 1),
-                        new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 800, 0),
-                        new PotionEffect(PotionEffectType.RESISTANCE, 40, 4)
-                ), 1f))
-                .build());
+        nutriProtection(item);
         mark(item, "nutri");
+        return item;
+    }
+
+    static ItemStack ferreo() {
+        ItemStack item = base(
+                "Tótem Férreo",
+                NamedTextColor.GRAY,
+                List.of(
+                        line("Otorga los mismos efectos que un"),
+                        line("Nutritótem al popear."),
+                        line("Otorga dos corazones extras cuando"),
+                        line("lo tienes en la mano secundaria")
+                ),
+                FERREO_MODEL
+        );
+        nutriProtection(item);
+        item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.itemAttributes()
+                .addModifier(
+                        Attribute.MAX_HEALTH,
+                        new AttributeModifier(FERREO_HEALTH, 4, AttributeModifier.Operation.ADD_NUMBER),
+                        EquipmentSlotGroup.OFFHAND,
+                        AttributeModifierDisplay.hidden()
+                )
+                .build());
+        mark(item, "ferreo");
         return item;
     }
 
@@ -125,7 +163,11 @@ final class DreamerTotem {
         ItemStack item = base(
                 "Tótem de los no-muertos",
                 NamedTextColor.DARK_PURPLE,
-                List.of(line("Tótem que usan los no muertos para vengarse de tí, usarlo a tu favor te traerá consecuencias...")),
+                List.of(
+                        line("Tótem que usan los no muertos para"),
+                        line("vengarse de tí, usarlo a tu favor te traerá"),
+                        line("consecuencias...")
+                ),
                 UNDEAD_MODEL
         );
         mark(item, "undead");
@@ -160,6 +202,9 @@ final class DreamerTotem {
                 if ("nutri".equals(type)) {
                     return Kind.NUTRI;
                 }
+                if ("ferreo".equals(type)) {
+                    return Kind.FERREO;
+                }
                 if ("undead".equals(type)) {
                     return Kind.UNDEAD;
                 }
@@ -169,6 +214,9 @@ final class DreamerTotem {
         if (NUTRI_MODEL.equals(model)) {
             return Kind.NUTRI;
         }
+        if (FERREO_MODEL.equals(model)) {
+            return Kind.FERREO;
+        }
         if (UNDEAD_MODEL.equals(model)) {
             return Kind.UNDEAD;
         }
@@ -176,6 +224,14 @@ final class DreamerTotem {
             return Kind.DREAMER;
         }
         return Kind.PLAIN;
+    }
+
+    static NamedTextColor chatColor(Kind kind) {
+        return switch (kind) {
+            case FERREO, UNDEAD -> NamedTextColor.AQUA;
+            case DREAMER -> NamedTextColor.LIGHT_PURPLE;
+            default -> NamedTextColor.YELLOW;
+        };
     }
 
     static boolean isDreamer(ItemStack item) {
@@ -206,13 +262,36 @@ final class DreamerTotem {
     }
 
     private static Component line(String text) {
-        return Component.text(text, NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false);
+        return line(text, NamedTextColor.WHITE);
+    }
+
+    private static Component line(String text, NamedTextColor color) {
+        return Component.text(text, color).decoration(TextDecoration.ITALIC, false);
+    }
+
+    private static void nutriProtection(ItemStack item) {
+        item.setData(DataComponentTypes.DEATH_PROTECTION, DeathProtection.deathProtection()
+                .addEffect(ConsumeEffect.clearAllStatusEffects())
+                .addEffect(ConsumeEffect.applyStatusEffects(List.of(
+                        new PotionEffect(PotionEffectType.REGENERATION, 900, 1),
+                        new PotionEffect(PotionEffectType.ABSORPTION, 100, 1),
+                        new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 800, 0),
+                        new PotionEffect(PotionEffectType.RESISTANCE, 40, 4)
+                ), 1f))
+                .build());
     }
 
     private static RecipeChoice plainTotem() {
         return RecipeChoice.predicateChoice(
                 item -> isTotem(item) && kind(item) == Kind.PLAIN,
                 ItemStack.of(Material.TOTEM_OF_UNDYING)
+        );
+    }
+
+    private static RecipeChoice nutriTotem() {
+        return RecipeChoice.predicateChoice(
+                item -> isTotem(item) && kind(item) == Kind.NUTRI,
+                nutri()
         );
     }
 
