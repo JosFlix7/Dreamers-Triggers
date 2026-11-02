@@ -2,7 +2,34 @@
   "description": {
     "text": "Tótem Dreamer",
     "color": "light_purple",
-    "italic": false
+    "italic": false,
+    "extra": [
+      {
+        "text": "\nPopea en tu inventario sin necesidad de",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\ntenerlo en tu mano principal o secundaria.",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nADVERTENCIA: El juego prioriza usar el",
+        "color": "yellow",
+        "italic": false
+      },
+      {
+        "text": "\ntótem que tengas en tu mano principal o",
+        "color": "yellow",
+        "italic": false
+      },
+      {
+        "text": "\nsecundaria antes que este tótem",
+        "color": "yellow",
+        "italic": false
+      }
+    ]
   },
   "supported_items": "minecraft:air",
   "slots": [],

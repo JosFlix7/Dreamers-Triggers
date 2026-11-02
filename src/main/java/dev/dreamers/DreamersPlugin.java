@@ -21,9 +21,11 @@ public final class DreamersPlugin extends JavaPlugin {
         deathUhc = new DeathUhc(this);
         listener = new DreamersListener(this);
         bundles = new BundleSack(this);
+        Enderbag.enable(this);
         getServer().getPluginManager().registerEvents(listener, this);
         getServer().getPluginManager().registerEvents(deathUhc, this);
         getServer().getPluginManager().registerEvents(bundles, this);
+        getServer().getPluginManager().registerEvents(new TotemBooks(this), this);
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
             DreamersCommand command = new DreamersCommand(deathUhc);

@@ -2,7 +2,24 @@
   "description": {
     "text": "Tótem de los no-muertos",
     "color": "dark_purple",
-    "italic": false
+    "italic": false,
+    "extra": [
+      {
+        "text": "\nTótem que usan los no muertos para",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nvengarse de tí, usarlo a tu favor te traerá",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nconsecuencias...",
+        "color": "white",
+        "italic": false
+      }
+    ]
   },
   "supported_items": "minecraft:air",
   "slots": [],

@@ -2,7 +2,19 @@
   "description": {
     "text": "Nutritótem",
     "color": "green",
-    "italic": false
+    "italic": false,
+    "extra": [
+      {
+        "text": "\nOtorga 2 segundos de resistencia infinita",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\npara poder escapar de la situación peligrosa.",
+        "color": "white",
+        "italic": false
+      }
+    ]
   },
   "supported_items": "minecraft:air",
   "slots": [],

@@ -2,6 +2,7 @@ package dev.dreamers;
 
 import io.papermc.paper.datacomponent.DataComponentType;
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ItemContainerContents;
 import io.papermc.paper.datacomponent.item.ItemLore;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
@@ -11,12 +12,14 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockType;
+import org.bukkit.block.ShulkerBox;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -29,11 +32,13 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -43,6 +48,9 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -61,20 +69,34 @@ final class BundleSack implements Listener {
             "Abre el saco con clic derecho en la mano principal.",
             NamedTextColor.YELLOW
     );
-    private static final Component REJECTED = Component.text(
-            "No puedes meter sacos ni cajas de shulker.",
+    private static final Component REJECTED_SACK = Component.text(
+            "Solo puedes meter un saco si está vacío.",
+            NamedTextColor.RED
+    );
+    private static final Component REJECTED_SHULKER = Component.text(
+            "No puedes meter cajas de shulker.",
             NamedTextColor.RED
     );
     private static final Component OVERFLOW = Component.text(
             "Lo que no cupo en el saco se soltó al suelo.",
             NamedTextColor.YELLOW
     );
+    private static final Component MEDIUM_NAME = Component.text("Saco Mediano", NamedTextColor.YELLOW)
+            .decoration(TextDecoration.ITALIC, false);
+    private static final Component LARGE_NAME = Component.text("Saco grande", NamedTextColor.GOLD)
+            .decoration(TextDecoration.ITALIC, false);
+    private static final Component SHULKER_NAME = Component.text("Saco Shulker", NamedTextColor.LIGHT_PURPLE)
+            .decoration(TextDecoration.ITALIC, false);
 
     private final JavaPlugin plugin;
     private final NamespacedKey readyKey;
     private final NamespacedKey idKey;
     private final NamespacedKey itemsKey;
     private final NamespacedKey slotsKey;
+    private final NamespacedKey sizeKey;
+    private final NamespacedKey mediumKey;
+    private final NamespacedKey largeKey;
+    private final NamespacedKey shulkerKey;
     private final Map<UUID, Open> open = new HashMap<>();
     private final Set<UUID> opening = new HashSet<>();
 
@@ -84,6 +106,11 @@ final class BundleSack implements Listener {
         idKey = new NamespacedKey(plugin, "bundle_sack_id");
         itemsKey = new NamespacedKey(plugin, "bundle_sack_items");
         slotsKey = new NamespacedKey(plugin, "bundle_sack_slots");
+        sizeKey = new NamespacedKey(plugin, "bundle_sack_size");
+        mediumKey = new NamespacedKey(plugin, "sack_medium");
+        largeKey = new NamespacedKey(plugin, "sack_large");
+        shulkerKey = new NamespacedKey(plugin, "sack_shulker");
+        registerSackRecipes();
     }
 
     void shutdown() {
@@ -153,6 +180,10 @@ final class BundleSack implements Listener {
             if (!isBundle(hand) || player.getOpenInventory().getTopInventory().getHolder(false) instanceof SackHolder) {
                 return;
             }
+            if (Enderbag.is(hand)) {
+                Enderbag.open(player);
+                return;
+            }
             Prepared prepared = prepare(hand);
             player.getInventory().setItem(slot, prepared.stack);
             spill(player, prepared.leftover);
@@ -162,30 +193,40 @@ final class BundleSack implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+        if (swapSackOntoSlot(event)) {
+            return;
+        }
+        Open sack = open.get(player.getUniqueId());
+        if (sack != null
+                && event.getView().getTopInventory().getHolder(false) == sack.holder
+                && chestInsteadOfBundle(event, player, sack)) {
+            return;
+        }
         if (vanillaBundleClick(event)) {
             event.setCancelled(true);
-            if (event.getWhoClicked() instanceof Player player
-                    && !(player.getOpenInventory().getTopInventory().getHolder(false) instanceof SackHolder)) {
+            if (!(player.getOpenInventory().getTopInventory().getHolder(false) instanceof SackHolder)) {
                 player.sendActionBar(OPEN_HINT);
             }
             return;
         }
-        if (!(event.getWhoClicked() instanceof Player player)) {
-            return;
-        }
-        Open sack = open.get(player.getUniqueId());
         if (sack == null || event.getView().getTopInventory().getHolder(false) != sack.holder) {
             return;
         }
         boolean moving = movesOpenSack(event, sack);
-        boolean rejected = isForbidden(entering(event));
-        if (!moving && !rejected) {
+        ItemStack incoming = entering(event);
+        boolean rejected = isForbidden(incoming);
+        if (moving || rejected) {
+            event.setCancelled(true);
+            if (rejected && !moving) {
+                player.sendActionBar(rejection(incoming));
+                playBundle(player, Sound.ITEM_BUNDLE_INSERT_FAIL);
+            }
             return;
         }
-        event.setCancelled(true);
-        if (rejected && !moving) {
-            player.sendActionBar(REJECTED);
-        }
+        sack.previous = copy(sack.holder.inventory);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -201,27 +242,34 @@ final class BundleSack implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (!isForbidden(event.getOldCursor())) {
-            return;
-        }
-        int top = event.getView().getTopInventory().getSize();
-        for (int raw : event.getRawSlots()) {
-            if (raw < top) {
-                event.setCancelled(true);
-                player.sendActionBar(REJECTED);
-                return;
+        if (isForbidden(event.getOldCursor())) {
+            int top = event.getView().getTopInventory().getSize();
+            for (int raw : event.getRawSlots()) {
+                if (raw < top) {
+                    event.setCancelled(true);
+                    player.sendActionBar(rejection(event.getOldCursor()));
+                    playBundle(player, Sound.ITEM_BUNDLE_INSERT_FAIL);
+                    return;
+                }
             }
         }
+        sack.previous = copy(sack.holder.inventory);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void afterClick(InventoryClickEvent event) {
-        remember(event.getWhoClicked() instanceof Player player ? player : null);
+        if (event.getWhoClicked() instanceof Player player) {
+            playContentsChange(player);
+            remember(player);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void afterDrag(InventoryDragEvent event) {
-        remember(event.getWhoClicked() instanceof Player player ? player : null);
+        if (event.getWhoClicked() instanceof Player player) {
+            playContentsChange(player);
+            remember(player);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -252,7 +300,7 @@ final class BundleSack implements Listener {
         open.remove(player.getUniqueId());
         save(player, sack, true);
         if (plugin.isEnabled()) {
-            player.playSound(player.getLocation(), Sound.BLOCK_CHEST_CLOSE, SoundCategory.PLAYERS, 0.5f, 1f);
+            playBundle(player, Sound.ITEM_BUNDLE_REMOVE_ONE);
         }
     }
 
@@ -278,7 +326,44 @@ final class BundleSack implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        refreshVisible(event.getPlayer().getInventory());
+        Player player = event.getPlayer();
+        Enderbag.discover(player);
+        player.discoverRecipe(mediumKey);
+        player.discoverRecipe(largeKey);
+        player.discoverRecipe(shulkerKey);
+        refreshVisible(player.getInventory());
+    }
+
+    @EventHandler
+    public void onPrepareCraft(PrepareItemCraftEvent event) {
+        if (!(event.getRecipe() instanceof ShapedRecipe shaped)) {
+            return;
+        }
+        Upgrade upgrade = upgradeFor(shaped.getKey());
+        if (upgrade == null) {
+            return;
+        }
+        ItemStack source = sackIn(event.getInventory().getMatrix(), upgrade.from);
+        event.getInventory().setResult(source == null ? null : upgrade(source, upgrade));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCraft(CraftItemEvent event) {
+        if (!(event.getRecipe() instanceof ShapedRecipe shaped)) {
+            return;
+        }
+        Upgrade upgrade = upgradeFor(shaped.getKey());
+        if (upgrade == null) {
+            return;
+        }
+        ItemStack source = sackIn(event.getInventory().getMatrix(), upgrade.from);
+        if (source == null) {
+            event.setCancelled(true);
+            return;
+        }
+        ItemStack result = upgrade(source, upgrade);
+        event.setCurrentItem(result);
+        event.getInventory().setResult(result);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -330,7 +415,7 @@ final class BundleSack implements Listener {
         if (!isBundle(stack) || !stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
             return;
         }
-        ItemStack[] stored = new ItemStack[9];
+        ItemStack[] stored = new ItemStack[capacity(stack)];
         List<ItemStack> loose = new ArrayList<>();
         read(stack, stored, loose);
         for (ItemStack content : stored) {
@@ -358,7 +443,7 @@ final class BundleSack implements Listener {
         if (!isBundle(stack) || !stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
             return false;
         }
-        ItemStack[] stored = new ItemStack[9];
+        ItemStack[] stored = new ItemStack[capacity(stack)];
         read(stack, stored, new ArrayList<>());
         List<ItemStack> items = new ArrayList<>();
         for (ItemStack content : stored) {
@@ -467,10 +552,11 @@ final class BundleSack implements Listener {
         if (!matches(hand, id)) {
             return;
         }
-        ItemStack[] contents = new ItemStack[9];
+        int size = capacity(hand);
+        ItemStack[] contents = new ItemStack[size];
         read(hand, contents, new ArrayList<>());
         SackHolder holder = new SackHolder(id);
-        Inventory inventory = Bukkit.createInventory(holder, 9, hand.displayName());
+        Inventory inventory = Bukkit.createInventory(holder, size, hand.displayName());
         holder.inventory = inventory;
         for (int index = 0; index < contents.length; index++) {
             if (contents[index] != null) {
@@ -483,7 +569,7 @@ final class BundleSack implements Listener {
             open.remove(player.getUniqueId());
             return;
         }
-        player.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, SoundCategory.PLAYERS, 0.5f, 1f);
+        playBundle(player, Sound.ITEM_BUNDLE_DROP_CONTENTS);
     }
 
     private void remember(Player player) {
@@ -502,10 +588,11 @@ final class BundleSack implements Listener {
     }
 
     private void save(Player player, Open sack, boolean dropIfMissing) {
-        ItemStack[] contents = new ItemStack[9];
-        List<ItemStack> rejected = new ArrayList<>();
         Inventory inventory = sack.holder.inventory;
-        for (int index = 0; index < 9; index++) {
+        int size = inventory.getSize();
+        ItemStack[] contents = new ItemStack[size];
+        List<ItemStack> rejected = new ArrayList<>();
+        for (int index = 0; index < size; index++) {
             ItemStack item = inventory.getItem(index);
             if (item == null || item.getType().isAir()) {
                 continue;
@@ -583,7 +670,7 @@ final class BundleSack implements Listener {
         if (id == null) {
             id = UUID.randomUUID();
         }
-        ItemStack[] contents = new ItemStack[9];
+        ItemStack[] contents = new ItemStack[capacity(stack)];
         List<ItemStack> leftover = new ArrayList<>();
         if (!stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)
                 && stack.getItemMeta() instanceof BundleMeta meta
@@ -599,7 +686,7 @@ final class BundleSack implements Listener {
     }
 
     private void pack(List<ItemStack> items, ItemStack[] contents, List<ItemStack> leftover) {
-        Inventory temp = Bukkit.createInventory(null, 9);
+        Inventory temp = Bukkit.createInventory(null, contents.length);
         for (ItemStack item : items) {
             if (item == null || item.getType().isAir()) {
                 continue;
@@ -611,7 +698,7 @@ final class BundleSack implements Listener {
             }
             leftover.addAll(temp.addItem(copy).values());
         }
-        System.arraycopy(temp.getContents(), 0, contents, 0, 9);
+        System.arraycopy(temp.getContents(), 0, contents, 0, contents.length);
     }
 
     private void read(ItemStack stack, ItemStack[] contents, List<ItemStack> rejected) {
@@ -646,9 +733,9 @@ final class BundleSack implements Listener {
 
     private boolean write(ItemStack stack, UUID id, ItemStack[] contents) {
         List<ItemStack> items = new ArrayList<>();
-        byte[] slots = new byte[9];
+        byte[] slots = new byte[contents.length];
         int count = 0;
-        for (int slot = 0; slot < contents.length && slot < 9; slot++) {
+        for (int slot = 0; slot < contents.length; slot++) {
             ItemStack item = contents[slot];
             if (item == null || item.getType().isAir() || isForbidden(item)) {
                 continue;
@@ -663,6 +750,7 @@ final class BundleSack implements Listener {
             PersistentDataContainer data = meta.getPersistentDataContainer();
             data.set(readyKey, PersistentDataType.BYTE, (byte) 1);
             data.set(idKey, PersistentDataType.STRING, id.toString());
+            data.set(sizeKey, PersistentDataType.BYTE, (byte) contents.length);
             if (items.isEmpty()) {
                 data.remove(itemsKey);
                 data.remove(slotsKey);
@@ -750,11 +838,185 @@ final class BundleSack implements Listener {
         return stack != null && !stack.getType().isAir() && Tag.ITEMS_BUNDLES.isTagged(stack.getType());
     }
 
-    private static boolean isForbidden(ItemStack stack) {
+    private boolean isForbidden(ItemStack stack) {
         if (stack == null || stack.getType().isAir()) {
             return false;
         }
-        return Tag.ITEMS_BUNDLES.isTagged(stack.getType()) || Tag.ITEMS_SHULKER_BOXES.isTagged(stack.getType());
+        if (Tag.ITEMS_SHULKER_BOXES.isTagged(stack.getType())) {
+            return true;
+        }
+        return Tag.ITEMS_BUNDLES.isTagged(stack.getType()) && !isEmptySack(stack);
+    }
+
+    private boolean isEmptySack(ItemStack stack) {
+        if (!stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
+            return !(stack.getItemMeta() instanceof BundleMeta meta) || !meta.hasItems();
+        }
+        byte[] data = stack.getPersistentDataContainer().get(itemsKey, PersistentDataType.BYTE_ARRAY);
+        return data == null || data.length == 0;
+    }
+
+    private boolean swapSackOntoSlot(InventoryClickEvent event) {
+        InventoryAction action = event.getAction();
+        if (action != InventoryAction.PICKUP_ALL_INTO_BUNDLE && action != InventoryAction.PICKUP_SOME_INTO_BUNDLE) {
+            return false;
+        }
+        if (!isBundle(event.getCursor()) || !(event.getWhoClicked() instanceof Player player)) {
+            return false;
+        }
+        Inventory clicked = event.getClickedInventory();
+        ItemStack current = event.getCurrentItem();
+        if (clicked == null || current == null || current.getType().isAir()) {
+            return false;
+        }
+        Open sack = open.get(player.getUniqueId());
+        if (sack != null && event.getView().getTopInventory().getHolder(false) == sack.holder) {
+            if (clicked == event.getView().getTopInventory()) {
+                return false;
+            }
+            if (matches(event.getCursor(), sack.id) || matches(current, sack.id)) {
+                return false;
+            }
+        }
+        ItemStack cursor = event.getCursor().clone();
+        ItemStack occupied = current.clone();
+        int slot = event.getSlot();
+        event.setCancelled(true);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            clicked.setItem(slot, cursor);
+            player.setItemOnCursor(occupied);
+        });
+        return true;
+    }
+
+    private boolean chestInsteadOfBundle(InventoryClickEvent event, Player player, Open sack) {
+        if (event.getClickedInventory() != event.getView().getTopInventory() || !vanillaBundleClick(event)) {
+            return false;
+        }
+        event.setCancelled(true);
+        ItemStack cursor = event.getCursor();
+        ItemStack current = event.getCurrentItem();
+        if (isForbidden(cursor)) {
+            player.sendActionBar(rejection(cursor));
+            playBundle(player, Sound.ITEM_BUNDLE_INSERT_FAIL);
+            return true;
+        }
+        if (matches(cursor, sack.id) || matches(current, sack.id)) {
+            return true;
+        }
+        ItemStack newCursor;
+        ItemStack newSlot;
+        if (event.getClick() == ClickType.RIGHT) {
+            if (cursor == null || cursor.getType().isAir()) {
+                if (current == null || current.getType().isAir()) {
+                    return true;
+                }
+                newCursor = current.clone();
+                newCursor.setAmount(1);
+                newSlot = current.clone();
+                newSlot.setAmount(current.getAmount() - 1);
+            } else if (current == null || current.getType().isAir() || current.isSimilar(cursor)) {
+                int have = current == null || current.getType().isAir() ? 0 : current.getAmount();
+                int limit = cursor.getMaxStackSize();
+                if (have >= limit) {
+                    return true;
+                }
+                newSlot = have == 0 ? cursor.clone() : current.clone();
+                newSlot.setAmount(have + 1);
+                newCursor = cursor.clone();
+                newCursor.setAmount(cursor.getAmount() - 1);
+            } else {
+                return true;
+            }
+        } else if (event.getClick() == ClickType.LEFT) {
+            newCursor = current == null || current.getType().isAir() ? null : current.clone();
+            newSlot = cursor == null || cursor.getType().isAir() ? null : cursor.clone();
+        } else {
+            return true;
+        }
+        if (newCursor != null && newCursor.getType().isAir()) {
+            newCursor = null;
+        }
+        if (newSlot != null && newSlot.getAmount() <= 0) {
+            newSlot = null;
+        }
+        sack.previous = copy(sack.holder.inventory);
+        int slot = event.getSlot();
+        Inventory clicked = event.getClickedInventory();
+        ItemStack placeCursor = newCursor;
+        ItemStack placeSlot = newSlot;
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline() || open.get(player.getUniqueId()) != sack) {
+                return;
+            }
+            clicked.setItem(slot, placeSlot);
+            player.setItemOnCursor(placeCursor);
+            playContentsChange(player);
+            remember(player);
+        });
+        return true;
+    }
+
+    private void playContentsChange(Player player) {
+        Open sack = open.get(player.getUniqueId());
+        if (sack == null || sack.previous == null) {
+            return;
+        }
+        ItemStack[] before = sack.previous;
+        sack.previous = null;
+        ItemStack[] after = sack.holder.inventory.getContents();
+        int added = 0;
+        int removed = 0;
+        int length = Math.max(before.length, after.length);
+        for (int index = 0; index < length; index++) {
+            ItemStack oldItem = index < before.length ? before[index] : null;
+            ItemStack newItem = index < after.length ? after[index] : null;
+            int oldAmount = amount(oldItem);
+            int newAmount = amount(newItem);
+            if (oldAmount > 0 && newAmount > 0 && oldItem.isSimilar(newItem)) {
+                if (newAmount > oldAmount) {
+                    added += newAmount - oldAmount;
+                } else {
+                    removed += oldAmount - newAmount;
+                }
+            } else {
+                removed += oldAmount;
+                added += newAmount;
+            }
+        }
+        if (added > 0) {
+            playBundle(player, Sound.ITEM_BUNDLE_INSERT);
+        } else if (removed > 0) {
+            playBundle(player, Sound.ITEM_BUNDLE_REMOVE_ONE);
+        }
+    }
+
+    private static void playBundle(Player player, Sound sound) {
+        player.playSound(player.getLocation(), sound, SoundCategory.PLAYERS, 0.8f, 1f);
+    }
+
+    private static ItemStack[] copy(Inventory inventory) {
+        ItemStack[] contents = inventory.getContents();
+        ItemStack[] copied = new ItemStack[contents.length];
+        for (int index = 0; index < contents.length; index++) {
+            ItemStack item = contents[index];
+            copied[index] = item == null ? null : item.clone();
+        }
+        return copied;
+    }
+
+    private static int amount(ItemStack stack) {
+        return stack == null || stack.getType().isAir() ? 0 : stack.getAmount();
+    }
+
+    private static Component rejection(ItemStack stack) {
+        if (stack != null && Tag.ITEMS_BUNDLES.isTagged(stack.getType())) {
+            return REJECTED_SACK;
+        }
+        return REJECTED_SHULKER;
     }
 
     private void spill(Player player, List<ItemStack> items) {
@@ -774,10 +1036,149 @@ final class BundleSack implements Listener {
         }
     }
 
+    private void registerSackRecipes() {
+        Bukkit.removeRecipe(mediumKey);
+        Bukkit.removeRecipe(largeKey);
+        Bukkit.removeRecipe(shulkerKey);
+
+        ShapedRecipe medium = new ShapedRecipe(mediumKey, tierItem(18, MEDIUM_NAME, false));
+        medium.shape("DCD", "DSD", "DDD");
+        medium.setIngredient('D', Material.DIAMOND);
+        medium.setIngredient('C', Material.CHEST);
+        medium.setIngredient('S', sackChoice(9, ItemStack.of(Material.BUNDLE)));
+        Bukkit.addRecipe(medium);
+
+        ShapedRecipe large = new ShapedRecipe(largeKey, tierItem(27, LARGE_NAME, false));
+        large.shape("CDC", "DSD", "DDD");
+        large.setIngredient('D', Material.DIAMOND);
+        large.setIngredient('C', Material.CHEST);
+        large.setIngredient('S', sackChoice(18, tierItem(18, MEDIUM_NAME, false)));
+        Bukkit.addRecipe(large);
+
+        ShapedRecipe shulker = new ShapedRecipe(shulkerKey, tierItem(54, SHULKER_NAME, true));
+        shulker.shape("DHD", "DSD", "DDD");
+        shulker.setIngredient('D', Material.DIAMOND);
+        shulker.setIngredient('H', emptyShulker());
+        shulker.setIngredient('S', sackChoice(27, tierItem(27, LARGE_NAME, false)));
+        Bukkit.addRecipe(shulker);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.discoverRecipe(mediumKey);
+            player.discoverRecipe(largeKey);
+            player.discoverRecipe(shulkerKey);
+        }
+    }
+
+    private RecipeChoice sackChoice(int size, ItemStack example) {
+        return RecipeChoice.predicateChoice(
+                stack -> isBundle(stack) && !Enderbag.is(stack) && capacity(stack) == size,
+                example
+        );
+    }
+
+    private static RecipeChoice emptyShulker() {
+        return RecipeChoice.predicateChoice(BundleSack::isEmptyShulker, ItemStack.of(Material.SHULKER_BOX));
+    }
+
+    private static boolean isEmptyShulker(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || !Tag.ITEMS_SHULKER_BOXES.isTagged(stack.getType())) {
+            return false;
+        }
+        ItemContainerContents container = stack.getData(DataComponentTypes.CONTAINER);
+        if (container != null) {
+            for (ItemStack item : container.contents()) {
+                if (item != null && !item.getType().isAir()) {
+                    return false;
+                }
+            }
+        }
+        if (stack.getItemMeta() instanceof BlockStateMeta meta && meta.getBlockState() instanceof ShulkerBox box) {
+            for (ItemStack item : box.getInventory().getContents()) {
+                if (item != null && !item.getType().isAir()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private Upgrade upgradeFor(NamespacedKey key) {
+        if (mediumKey.equals(key)) {
+            return new Upgrade(9, 18, MEDIUM_NAME, false);
+        }
+        if (largeKey.equals(key)) {
+            return new Upgrade(18, 27, LARGE_NAME, false);
+        }
+        if (shulkerKey.equals(key)) {
+            return new Upgrade(27, 54, SHULKER_NAME, true);
+        }
+        return null;
+    }
+
+    private ItemStack sackIn(ItemStack[] matrix, int size) {
+        if (matrix == null) {
+            return null;
+        }
+        for (ItemStack item : matrix) {
+            if (isBundle(item) && !Enderbag.is(item) && capacity(item) == size) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private ItemStack upgrade(ItemStack source, Upgrade upgrade) {
+        ItemStack result = source.clone();
+        result.setAmount(1);
+        result.editMeta(meta -> meta.getPersistentDataContainer().set(sizeKey, PersistentDataType.BYTE, (byte) upgrade.to));
+        Component current = result.getData(DataComponentTypes.CUSTOM_NAME);
+        if (current == null || isTierName(current)) {
+            result.setData(DataComponentTypes.CUSTOM_NAME, upgrade.name);
+        }
+        if (upgrade.glint) {
+            result.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
+        }
+        return result;
+    }
+
+    private ItemStack tierItem(int size, Component name, boolean glint) {
+        ItemStack stack = ItemStack.of(Material.BUNDLE);
+        stack.editMeta(meta -> meta.getPersistentDataContainer().set(sizeKey, PersistentDataType.BYTE, (byte) size));
+        stack.setData(DataComponentTypes.CUSTOM_NAME, name);
+        if (glint) {
+            stack.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
+        }
+        return stack;
+    }
+
+    private int capacity(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            return 9;
+        }
+        Byte stored = stack.getPersistentDataContainer().get(sizeKey, PersistentDataType.BYTE);
+        if (stored == null) {
+            return 9;
+        }
+        int size = stored & 0xFF;
+        if (size == 9 || size == 18 || size == 27 || size == 54) {
+            return size;
+        }
+        return 9;
+    }
+
+    private static boolean isTierName(Component name) {
+        String text = PlainTextComponentSerializer.plainText().serialize(name);
+        return text.equals("Saco Mediano") || text.equals("Saco grande") || text.equals("Saco Shulker");
+    }
+
+    private record Upgrade(int from, int to, Component name, boolean glint) {
+    }
+
     private static final class Open {
         private final UUID id;
         private final int slot;
         private final SackHolder holder;
+        private ItemStack[] previous;
 
         private Open(UUID id, int slot, SackHolder holder) {
             this.id = id;

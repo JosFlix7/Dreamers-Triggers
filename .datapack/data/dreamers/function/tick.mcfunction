@@ -1,1 +1,1 @@
-execute as @a run function dreamers:convert
+# El plugin convierte el libro en el tótem real.

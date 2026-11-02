@@ -2,7 +2,29 @@
   "description": {
     "text": "Tótem Férreo",
     "color": "gray",
-    "italic": false
+    "italic": false,
+    "extra": [
+      {
+        "text": "\nOtorga los mismos efectos que un",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nNutritótem al popear.",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nOtorga dos corazones extras cuando",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nlo tienes en la mano secundaria",
+        "color": "white",
+        "italic": false
+      }
+    ]
   },
   "supported_items": "minecraft:air",
   "slots": [],
