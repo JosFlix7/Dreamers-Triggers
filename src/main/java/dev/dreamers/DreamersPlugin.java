@@ -7,6 +7,7 @@ public final class DreamersPlugin extends JavaPlugin {
     private DeathUhc deathUhc;
     private DreamersListener listener;
     private BundleSack bundles;
+    private TooltipServer tooltips;
     private boolean discord;
 
     @Override
@@ -26,6 +27,8 @@ public final class DreamersPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(deathUhc, this);
         getServer().getPluginManager().registerEvents(bundles, this);
         getServer().getPluginManager().registerEvents(new TotemBooks(this), this);
+        tooltips = new TooltipServer(this);
+        tooltips.enable();
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
             DreamersCommand command = new DreamersCommand(deathUhc);
@@ -49,6 +52,9 @@ public final class DreamersPlugin extends JavaPlugin {
         }
         if (bundles != null) {
             bundles.shutdown();
+        }
+        if (tooltips != null) {
+            tooltips.disable();
         }
     }
 }
