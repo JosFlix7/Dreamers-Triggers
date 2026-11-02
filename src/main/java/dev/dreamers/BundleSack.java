@@ -451,41 +451,98 @@ final class BundleSack implements Listener {
                 items.add(content);
             }
         }
-        if (previewMatches(stack, items)) {
+        List<Component> lines = previewLines(items);
+        if (previewMatches(stack, lines, stored)) {
             return false;
         }
-        applyPreview(stack, items);
+        applyPreview(stack, lines, stored);
         return true;
     }
 
-    private void applyPreview(ItemStack stack, List<ItemStack> items) {
-        stack.unsetData(DataComponentTypes.CONTAINER);
-        if (items.isEmpty()) {
+    private void applyPreview(ItemStack stack, List<Component> lines, ItemStack[] contents) {
+        if (lines.isEmpty()) {
+            stack.unsetData(DataComponentTypes.CONTAINER);
             stack.unsetData(DataComponentTypes.LORE);
             revealBundleTooltip(stack);
             return;
         }
+        stack.setData(DataComponentTypes.CONTAINER, ItemContainerContents.containerContents(containerSlots(contents)));
         ItemLore.Builder lore = ItemLore.lore();
-        for (ItemStack item : items) {
-            lore.addLine(loreLine(item));
+        for (Component line : lines) {
+            lore.addLine(line);
         }
         stack.setData(DataComponentTypes.LORE, lore);
         hideBundleTooltip(stack);
     }
 
-    private boolean previewMatches(ItemStack stack, List<ItemStack> items) {
-        boolean hidden = bundleTooltipHidden(stack);
-        boolean hasContainer = stack.getData(DataComponentTypes.CONTAINER) != null;
-        ItemLore lore = stack.getData(DataComponentTypes.LORE);
-        if (items.isEmpty()) {
-            return !hasContainer && lore == null && !hidden;
+    private List<Component> previewLines(List<ItemStack> items) {
+        List<Component> lines = new ArrayList<>();
+        int shown = Math.min(9, items.size());
+        for (int index = 0; index < shown; index++) {
+            lines.add(loreLine(items.get(index)));
         }
-        if (!hidden || hasContainer || lore == null || lore.lines().size() != items.size()) {
+        int extra = items.size() - shown;
+        if (extra > 0) {
+            lines.add(Component.text("y " + extra + " mas...", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        }
+        return lines;
+    }
+
+    private List<ItemStack> containerSlots(ItemStack[] contents) {
+        List<ItemStack> slots = new ArrayList<>(contents.length);
+        for (ItemStack content : contents) {
+            slots.add(content == null || content.getType().isAir() ? ItemStack.empty() : content.clone());
+        }
+        return slots;
+    }
+
+    private boolean containerMatches(ItemStack stack, ItemStack[] contents) {
+        ItemContainerContents container = stack.getData(DataComponentTypes.CONTAINER);
+        List<ItemStack> occupied = new ArrayList<>();
+        for (ItemStack content : contents) {
+            if (content != null && !content.getType().isAir()) {
+                occupied.add(content);
+            }
+        }
+        if (occupied.isEmpty()) {
+            return container == null;
+        }
+        if (container == null) {
+            return false;
+        }
+        List<ItemStack> actual = new ArrayList<>();
+        for (ItemStack content : container.contents()) {
+            if (content != null && !content.getType().isAir()) {
+                actual.add(content);
+            }
+        }
+        if (actual.size() != occupied.size()) {
+            return false;
+        }
+        for (int index = 0; index < occupied.size(); index++) {
+            if (!sameOccupant(occupied.get(index), actual.get(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameOccupant(ItemStack expected, ItemStack actual) {
+        return expected.getAmount() == actual.getAmount() && expected.isSimilar(actual);
+    }
+
+    private boolean previewMatches(ItemStack stack, List<Component> expected, ItemStack[] contents) {
+        boolean hidden = bundleTooltipHidden(stack);
+        ItemLore lore = stack.getData(DataComponentTypes.LORE);
+        if (expected.isEmpty()) {
+            return containerMatches(stack, contents) && lore == null && !hidden;
+        }
+        if (!hidden || !containerMatches(stack, contents) || lore == null || lore.lines().size() != expected.size()) {
             return false;
         }
         List<Component> lines = lore.lines();
-        for (int index = 0; index < items.size(); index++) {
-            if (!plain(lines.get(index)).equals(plain(loreLine(items.get(index))))) {
+        for (int index = 0; index < expected.size(); index++) {
+            if (!plain(lines.get(index)).equals(plain(expected.get(index)))) {
                 return false;
             }
         }
@@ -761,7 +818,7 @@ final class BundleSack implements Listener {
             meta.setItems(null);
         });
         if (stored) {
-            applyPreview(stack, items);
+            applyPreview(stack, previewLines(items), contents);
         }
         return stored;
     }
