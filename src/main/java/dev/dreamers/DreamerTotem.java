@@ -19,10 +19,12 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlotGroup;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -30,6 +32,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
+import java.util.Map;
 
 final class DreamerTotem {
     enum Kind {
@@ -37,20 +40,24 @@ final class DreamerTotem {
         DREAMER,
         NUTRI,
         FERREO,
+        YUNQUE,
         UNDEAD
     }
 
     private static final Key DREAMER_MODEL = Key.key("dreamers", "dreamers_totem");
     private static final Key NUTRI_MODEL = Key.key("dreamers", "nutritotem");
     private static final Key FERREO_MODEL = Key.key("dreamers", "totem_ferreo");
+    private static final Key YUNQUE_MODEL = Key.key("dreamers", "totem_yunque");
     private static final Key UNDEAD_MODEL = Key.key("dreamers", "totem_of_undeads");
     private static final NamespacedKey FERREO_HEALTH = new NamespacedKey("dreamers", "totem_ferreo_health");
+    private static final NamespacedKey DREAMER_HEALTH = new NamespacedKey("dreamers", "totem_dreamer_health");
 
     private static NamespacedKey dreamerMark;
     private static NamespacedKey typeMark;
     private static NamespacedKey recipe;
     private static NamespacedKey nutriRecipe;
     private static NamespacedKey ferreoRecipe;
+    private static NamespacedKey yunqueRecipe;
 
     private DreamerTotem() {}
 
@@ -64,7 +71,7 @@ final class DreamerTotem {
         dreamerRecipe.setIngredient('D', Material.DIAMOND);
         dreamerRecipe.setIngredient('A', Material.AMETHYST_SHARD);
         dreamerRecipe.setIngredient('E', Material.ENDER_EYE);
-        dreamerRecipe.setIngredient('T', nutriTotem());
+        dreamerRecipe.setIngredient('T', ferreoTotem());
         Bukkit.addRecipe(dreamerRecipe);
         nutriRecipe = new NamespacedKey(plugin, "nutritotem");
         Bukkit.removeRecipe(nutriRecipe);
@@ -81,6 +88,15 @@ final class DreamerTotem {
         iron.setIngredient('I', Material.IRON_BLOCK);
         iron.setIngredient('N', nutriTotem());
         Bukkit.addRecipe(iron);
+        yunqueRecipe = new NamespacedKey(plugin, "totem_yunque");
+        Bukkit.removeRecipe(yunqueRecipe);
+        ShapedRecipe anvil = new ShapedRecipe(yunqueRecipe, yunque());
+        anvil.shape("DBD", "DND", "DAD");
+        anvil.setIngredient('D', Material.DIAMOND);
+        anvil.setIngredient('B', mendingBook());
+        anvil.setIngredient('N', nutriTotem());
+        anvil.setIngredient('A', Material.ANVIL);
+        Bukkit.addRecipe(anvil);
         for (Player player : Bukkit.getOnlinePlayers()) {
             discover(player);
             refreshCarried(player);
@@ -97,23 +113,21 @@ final class DreamerTotem {
         if (ferreoRecipe != null) {
             player.discoverRecipe(ferreoRecipe);
         }
+        if (yunqueRecipe != null) {
+            player.discoverRecipe(yunqueRecipe);
+        }
     }
 
     static ItemStack dreamer() {
         ItemStack item = base(
                 "Tótem Dreamer",
                 ItemRarity.EPIC.color(),
-                List.of(
-                        line("Popea en tu inventario sin necesidad de"),
-                        line("tenerlo en tu mano principal o secundaria."),
-                        line("ADVERTENCIA: El juego prioriza usar el", NamedTextColor.YELLOW),
-                        line("tótem que tengas en tu mano principal o", NamedTextColor.YELLOW),
-                        line("secundaria antes que este tótem", NamedTextColor.YELLOW)
-                ),
+                dreamerLore(),
                 DREAMER_MODEL
         );
         item.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
         item.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
+        item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
         item.editMeta(meta -> meta.getPersistentDataContainer().set(dreamerMark, PersistentDataType.BOOLEAN, true));
         return item;
     }
@@ -124,7 +138,7 @@ final class DreamerTotem {
                 NamedTextColor.GREEN,
                 List.of(
                         line("Otorga 2 segundos de resistencia infinita"),
-                        line("para poder escapar de la situación peligrosa.")
+                        line("para poder escapar de una situación peligrosa.")
                 ),
                 NUTRI_MODEL
         );
@@ -155,6 +169,22 @@ final class DreamerTotem {
                 )
                 .build());
         mark(item, "ferreo");
+        return item;
+    }
+
+    static ItemStack yunque() {
+        ItemStack item = base(
+                "Tótem Yunque",
+                NamedTextColor.GOLD,
+                List.of(
+                        line("Otorga los mismos efectos que un"),
+                        line("Nutritótem al popear y además"),
+                        line("repara tu set completo de armadura.")
+                ),
+                YUNQUE_MODEL
+        );
+        nutriProtection(item);
+        mark(item, "yunque");
         return item;
     }
 
@@ -204,6 +234,9 @@ final class DreamerTotem {
                 if ("ferreo".equals(type)) {
                     return Kind.FERREO;
                 }
+                if ("yunque".equals(type)) {
+                    return Kind.YUNQUE;
+                }
                 if ("undead".equals(type)) {
                     return Kind.UNDEAD;
                 }
@@ -215,6 +248,9 @@ final class DreamerTotem {
         }
         if (FERREO_MODEL.equals(model)) {
             return Kind.FERREO;
+        }
+        if (YUNQUE_MODEL.equals(model)) {
+            return Kind.YUNQUE;
         }
         if (UNDEAD_MODEL.equals(model)) {
             return Kind.UNDEAD;
@@ -228,6 +264,7 @@ final class DreamerTotem {
     static NamedTextColor chatColor(Kind kind) {
         return switch (kind) {
             case FERREO, UNDEAD -> NamedTextColor.AQUA;
+            case YUNQUE -> NamedTextColor.GOLD;
             case DREAMER -> NamedTextColor.LIGHT_PURPLE;
             default -> NamedTextColor.YELLOW;
         };
@@ -245,8 +282,10 @@ final class DreamerTotem {
         ItemStack[] contents = player.getInventory().getContents();
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack item = contents[slot];
-            if (isDreamer(item) && item.getData(DataComponentTypes.ITEM_MODEL) == null) {
+            if (isDreamer(item)) {
                 item.setData(DataComponentTypes.ITEM_MODEL, DREAMER_MODEL);
+                item.setData(DataComponentTypes.LORE, ItemLore.lore(dreamerLore()));
+                item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
                 player.getInventory().setItem(slot, item);
             }
         }
@@ -292,6 +331,62 @@ final class DreamerTotem {
                 item -> isTotem(item) && kind(item) == Kind.NUTRI,
                 nutri()
         );
+    }
+
+    private static RecipeChoice ferreoTotem() {
+        return RecipeChoice.predicateChoice(
+                item -> isTotem(item) && kind(item) == Kind.FERREO,
+                ferreo()
+        );
+    }
+
+    private static RecipeChoice mendingBook() {
+        ItemStack book = ItemStack.of(Material.ENCHANTED_BOOK);
+        book.editMeta(meta -> {
+            if (meta instanceof EnchantmentStorageMeta stored) {
+                stored.addStoredEnchant(Enchantment.MENDING, 1, true);
+            }
+        });
+        return RecipeChoice.predicateChoice(DreamerTotem::onlyMending, book);
+    }
+
+    private static boolean onlyMending(ItemStack item) {
+        if (item == null || item.getType() != Material.ENCHANTED_BOOK) {
+            return false;
+        }
+        if (!(item.getItemMeta() instanceof EnchantmentStorageMeta meta)) {
+            return false;
+        }
+        Map<Enchantment, Integer> stored = meta.getStoredEnchants();
+        if (stored.size() != 1) {
+            return false;
+        }
+        Map.Entry<Enchantment, Integer> only = stored.entrySet().iterator().next();
+        return only.getValue() > 0 && only.getKey().getKey().equals(Enchantment.MENDING.getKey());
+    }
+
+    private static List<Component> dreamerLore() {
+        return List.of(
+                line("Popea en tu inventario sin necesidad de"),
+                line("tenerlo en tu mano principal o secundaria."),
+                line("Otorga 4 segundos de resistencia infinita"),
+                line("al popear y cuatro corazones extras cuando"),
+                line("lo tienes en la mano secundaria."),
+                line("ADVERTENCIA: El juego prioriza usar el", NamedTextColor.YELLOW),
+                line("tótem que tengas en tu mano principal o", NamedTextColor.YELLOW),
+                line("secundaria antes que este tótem", NamedTextColor.YELLOW)
+        );
+    }
+
+    private static ItemAttributeModifiers dreamerAttributes() {
+        return ItemAttributeModifiers.itemAttributes()
+                .addModifier(
+                        Attribute.MAX_HEALTH,
+                        new AttributeModifier(DREAMER_HEALTH, 8, AttributeModifier.Operation.ADD_NUMBER),
+                        EquipmentSlotGroup.OFFHAND,
+                        AttributeModifierDisplay.hidden()
+                )
+                .build();
     }
 
     private static void mark(ItemStack item, String type) {

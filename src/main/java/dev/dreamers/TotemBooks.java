@@ -28,6 +28,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 final class TotemBooks implements Listener {
     private static final NamespacedKey NUTRI = new NamespacedKey("dreamers", "nutritotem");
     private static final NamespacedKey FERREO = new NamespacedKey("dreamers", "totem_ferreo");
+    private static final NamespacedKey YUNQUE = new NamespacedKey("dreamers", "totem_yunque");
     private static final NamespacedKey UNDEAD = new NamespacedKey("dreamers", "totem_of_undeads");
     private static final NamespacedKey DREAMER = new NamespacedKey("dreamers", "dreamers_totem");
 
@@ -205,6 +206,9 @@ final class TotemBooks implements Listener {
         }
         if (has(meta, FERREO)) {
             return DreamerTotem.ferreo();
+        }
+        if (has(meta, YUNQUE)) {
+            return DreamerTotem.yunque();
         }
         if (has(meta, UNDEAD)) {
             return DreamerTotem.undead();

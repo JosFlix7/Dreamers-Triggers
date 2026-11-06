@@ -3,7 +3,6 @@ package dev.dreamers;
 import io.papermc.paper.datacomponent.DataComponentType;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.ItemContainerContents;
-import io.papermc.paper.datacomponent.item.ItemLore;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -445,47 +444,31 @@ final class BundleSack implements Listener {
         }
         ItemStack[] stored = new ItemStack[capacity(stack)];
         read(stack, stored, new ArrayList<>());
-        List<ItemStack> items = new ArrayList<>();
-        for (ItemStack content : stored) {
-            if (content != null && !content.getType().isAir()) {
-                items.add(content);
-            }
-        }
-        List<Component> lines = previewLines(items);
-        if (previewMatches(stack, lines, stored)) {
+        if (previewMatches(stack, stored)) {
             return false;
         }
-        applyPreview(stack, lines, stored);
+        applyPreview(stack, stored);
         return true;
     }
 
-    private void applyPreview(ItemStack stack, List<Component> lines, ItemStack[] contents) {
-        if (lines.isEmpty()) {
+    private void applyPreview(ItemStack stack, ItemStack[] contents) {
+        stack.unsetData(DataComponentTypes.LORE);
+        if (!occupied(contents)) {
             stack.unsetData(DataComponentTypes.CONTAINER);
-            stack.unsetData(DataComponentTypes.LORE);
             revealBundleTooltip(stack);
             return;
         }
         stack.setData(DataComponentTypes.CONTAINER, ItemContainerContents.containerContents(containerSlots(contents)));
-        ItemLore.Builder lore = ItemLore.lore();
-        for (Component line : lines) {
-            lore.addLine(line);
-        }
-        stack.setData(DataComponentTypes.LORE, lore);
         hideBundleTooltip(stack);
     }
 
-    private List<Component> previewLines(List<ItemStack> items) {
-        List<Component> lines = new ArrayList<>();
-        int shown = Math.min(9, items.size());
-        for (int index = 0; index < shown; index++) {
-            lines.add(loreLine(items.get(index)));
+    private static boolean occupied(ItemStack[] contents) {
+        for (ItemStack content : contents) {
+            if (content != null && !content.getType().isAir()) {
+                return true;
+            }
         }
-        int extra = items.size() - shown;
-        if (extra > 0) {
-            lines.add(Component.text("y " + extra + " mas...", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-        }
-        return lines;
+        return false;
     }
 
     private List<ItemStack> containerSlots(ItemStack[] contents) {
@@ -531,34 +514,15 @@ final class BundleSack implements Listener {
         return expected.getAmount() == actual.getAmount() && expected.isSimilar(actual);
     }
 
-    private boolean previewMatches(ItemStack stack, List<Component> expected, ItemStack[] contents) {
-        boolean hidden = bundleTooltipHidden(stack);
-        ItemLore lore = stack.getData(DataComponentTypes.LORE);
-        if (expected.isEmpty()) {
-            return containerMatches(stack, contents) && lore == null && !hidden;
-        }
-        if (!hidden || !containerMatches(stack, contents) || lore == null || lore.lines().size() != expected.size()) {
+    private boolean previewMatches(ItemStack stack, ItemStack[] contents) {
+        if (stack.getData(DataComponentTypes.LORE) != null) {
             return false;
         }
-        List<Component> lines = lore.lines();
-        for (int index = 0; index < expected.size(); index++) {
-            if (!plain(lines.get(index)).equals(plain(expected.get(index)))) {
-                return false;
-            }
+        boolean hidden = bundleTooltipHidden(stack);
+        if (!occupied(contents)) {
+            return containerMatches(stack, contents) && !hidden;
         }
-        return true;
-    }
-
-    private static Component loreLine(ItemStack item) {
-        Component line = item.displayName();
-        if (item.getAmount() > 1) {
-            line = line.append(Component.text(" x" + item.getAmount()));
-        }
-        return line.colorIfAbsent(NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false);
-    }
-
-    private static String plain(Component component) {
-        return PlainTextComponentSerializer.plainText().serialize(component);
+        return containerMatches(stack, contents) && hidden;
     }
 
     private void hideBundleTooltip(ItemStack stack) {
@@ -818,7 +782,7 @@ final class BundleSack implements Listener {
             meta.setItems(null);
         });
         if (stored) {
-            applyPreview(stack, previewLines(items), contents);
+            applyPreview(stack, contents);
         }
         return stored;
     }

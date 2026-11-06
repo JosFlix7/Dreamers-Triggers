@@ -1,0 +1,37 @@
+{
+  "description": {
+    "text": "Tótem Yunque",
+    "color": "gold",
+    "italic": false,
+    "extra": [
+      {
+        "text": "\nOtorga los mismos efectos que un",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nNutritótem al popear y además",
+        "color": "white",
+        "italic": false
+      },
+      {
+        "text": "\nrepara tu set completo de armadura.",
+        "color": "white",
+        "italic": false
+      }
+    ]
+  },
+  "supported_items": "minecraft:air",
+  "slots": [],
+  "max_level": 1,
+  "anvil_cost": 0,
+  "max_cost": {
+    "base": 1,
+    "per_level_above_first": 0
+  },
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 0
+  },
+  "weight": 1
+}

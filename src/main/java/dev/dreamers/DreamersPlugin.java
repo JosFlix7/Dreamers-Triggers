@@ -23,10 +23,13 @@ public final class DreamersPlugin extends JavaPlugin {
         listener = new DreamersListener(this);
         bundles = new BundleSack(this);
         Enderbag.enable(this);
+        ReinforcedNetherite.enable(this);
         getServer().getPluginManager().registerEvents(listener, this);
         getServer().getPluginManager().registerEvents(deathUhc, this);
         getServer().getPluginManager().registerEvents(bundles, this);
         getServer().getPluginManager().registerEvents(new TotemBooks(this), this);
+        getServer().getPluginManager().registerEvents(new WardenLoot(), this);
+        getServer().getPluginManager().registerEvents(new NetheriteHostiles(), this);
         tooltips = new TooltipServer(this);
         tooltips.enable();
         PluginCommand dreamers = getCommand("dreamers");

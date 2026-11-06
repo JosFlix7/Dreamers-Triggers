@@ -34,6 +34,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.Tag;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -106,7 +107,8 @@ final class DreamersListener implements Listener {
         Held held = heldTotem(entity);
         if (held != null) {
             DreamerTotem.Kind kind = DreamerTotem.kind(held.totem());
-            if (kind == DreamerTotem.Kind.PLAIN || kind == DreamerTotem.Kind.NUTRI || kind == DreamerTotem.Kind.FERREO) {
+            if (kind == DreamerTotem.Kind.PLAIN || kind == DreamerTotem.Kind.NUTRI
+                    || kind == DreamerTotem.Kind.FERREO || kind == DreamerTotem.Kind.YUNQUE) {
                 return;
             }
             event.setCancelled(true);
@@ -181,8 +183,11 @@ final class DreamersListener implements Listener {
         announce(player, totem, lastDamage.remove(player.getUniqueId()));
         if (kind == DreamerTotem.Kind.PLAIN) {
             player.playSound(BELL_SOUND, Sound.Emitter.self());
-        } else if (kind == DreamerTotem.Kind.NUTRI || kind == DreamerTotem.Kind.FERREO) {
+        } else if (kind == DreamerTotem.Kind.NUTRI || kind == DreamerTotem.Kind.FERREO || kind == DreamerTotem.Kind.YUNQUE) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 4));
+            if (kind == DreamerTotem.Kind.YUNQUE) {
+                repairWornArmor(player);
+            }
         }
     }
 
@@ -191,7 +196,7 @@ final class DreamersListener implements Listener {
         if (!(event.getEntity() instanceof LivingEntity entity) || !isZombieOrSkeleton(entity)) {
             return;
         }
-        if (ThreadLocalRandom.current().nextDouble() >= 0.15) {
+        if (ThreadLocalRandom.current().nextDouble() >= 0.20) {
             return;
         }
         EntityEquipment equipment = entity.getEquipment();
@@ -207,7 +212,7 @@ final class DreamersListener implements Listener {
         if (!(event.getEntity() instanceof LivingEntity entity) || !isZombieOrSkeleton(entity)) {
             return;
         }
-        if (ThreadLocalRandom.current().nextDouble() < 0.05) {
+        if (ThreadLocalRandom.current().nextDouble() < 0.02) {
             event.getDrops().add(DreamerTotem.undead());
         }
     }
@@ -316,6 +321,9 @@ final class DreamersListener implements Listener {
         } else {
             DreamerTotem.applyStandardEffects(entity);
         }
+        if (kind == DreamerTotem.Kind.DREAMER) {
+            entity.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 80, 4));
+        }
         totemParticles(entity);
         if (kind == DreamerTotem.Kind.UNDEAD) {
             playVanillaTotem(entity, 0.75f);
@@ -405,6 +413,7 @@ final class DreamersListener implements Listener {
                 ? switch (kind) {
                     case NUTRI -> "Nutritótem";
                     case FERREO -> "Tótem Férreo";
+                    case YUNQUE -> "Tótem Yunque";
                     case DREAMER -> "Tótem Dreamer";
                     case UNDEAD -> "Tótem de los no-muertos";
                     default -> "Tótem";
@@ -413,6 +422,28 @@ final class DreamersListener implements Listener {
         return Component.text(" consumió ", NamedTextColor.YELLOW)
                 .append(Component.text(name, DreamerTotem.chatColor(kind)).decoration(TextDecoration.ITALIC, false))
                 .append(Component.text("!", NamedTextColor.YELLOW));
+    }
+
+    private static void repairWornArmor(Player player) {
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        for (ItemStack piece : armor) {
+            if (piece == null || piece.isEmpty() || !isArmor(piece)) {
+                continue;
+            }
+            Integer damage = piece.getData(DataComponentTypes.DAMAGE);
+            if (damage != null && damage > 0) {
+                piece.setData(DataComponentTypes.DAMAGE, 0);
+            }
+        }
+        player.getInventory().setArmorContents(armor);
+    }
+
+    private static boolean isArmor(ItemStack piece) {
+        Material type = piece.getType();
+        return Tag.ITEMS_HEAD_ARMOR.isTagged(type)
+                || Tag.ITEMS_CHEST_ARMOR.isTagged(type)
+                || Tag.ITEMS_LEG_ARMOR.isTagged(type)
+                || Tag.ITEMS_FOOT_ARMOR.isTagged(type);
     }
 
     private static boolean isUndead(LivingEntity entity) {
