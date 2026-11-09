@@ -1,0 +1,33 @@
+# El modo UHC por muerte. /dreamers DeathUCH lo cambia y guarda estos valores.
+death-uhc:
+  enabled: false
+  seconds: 60
+
+# Comandos que puede usar quien no es op y no tiene dreamers.commands.bypass.
+# El tabulador solo ofrece estos. El nombre va sin la barra.
+# minecraft:tell cuenta como tell. blocked acepta códigos de color &.
+commands:
+  allowed:
+    - tell
+    - msg
+    - me
+    - abandonclaim
+    - unclaim
+    - trust
+    - untrust
+    - containertrust
+    - accesstrust
+    - permissiontrust
+    - unlockdrops
+    - abandonallclaims
+    - givepet
+    - trustlist
+  blocked: "&cEste comando está bloqueado."
+
+# Xaero's Minimap. Los allow-* valen para quien no tiene regla propia.
+# level-id identifica el servidor ante el mod; no lo cambies.
+# /dreamers xm <jugador> <cuevas> <cuevasNether> <radar> guarda true o false para ese jugador.
+xaero:
+  allow-cave-mode: true
+  allow-nether-cave-mode: true
+  allow-radar: true

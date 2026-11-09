@@ -42,6 +42,18 @@ final class DeathUhc implements Listener {
 
     DeathUhc(JavaPlugin plugin) {
         this.plugin = plugin;
+        read();
+    }
+
+    void reload() {
+        boolean was = enabled;
+        read();
+        if (was && !enabled) {
+            stop();
+        }
+    }
+
+    private void read() {
         enabled = plugin.getConfig().getBoolean("death-uhc.enabled", false);
         seconds = plugin.getConfig().getInt("death-uhc.seconds", DEFAULT_SECONDS);
         if (seconds < 1 || seconds > MAX_SECONDS) {

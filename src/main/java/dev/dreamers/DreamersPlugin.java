@@ -8,10 +8,15 @@ public final class DreamersPlugin extends JavaPlugin {
     private DreamersListener listener;
     private BundleSack bundles;
     private TooltipServer tooltips;
+    private CommandFilter commands;
+    private AppleSkinSync appleSkin;
+    private XaeroMaps xaero;
     private boolean discord;
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
+        reloadConfig();
         DreamerTotem.enable(this);
         discord = getServer().getPluginManager().getPlugin("DiscordSRV") != null;
         if (discord) {
@@ -30,11 +35,20 @@ public final class DreamersPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TotemBooks(this), this);
         getServer().getPluginManager().registerEvents(new WardenLoot(), this);
         getServer().getPluginManager().registerEvents(new NetheriteHostiles(), this);
+        getServer().getPluginManager().registerEvents(new XpBottling(), this);
+        getServer().getPluginManager().registerEvents(new FastLeaves(), this);
         tooltips = new TooltipServer(this);
         tooltips.enable();
+        commands = new CommandFilter(this);
+        commands.load();
+        getServer().getPluginManager().registerEvents(commands, this);
+        appleSkin = new AppleSkinSync(this);
+        appleSkin.enable();
+        xaero = new XaeroMaps(this);
+        xaero.enable();
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
-            DreamersCommand command = new DreamersCommand(deathUhc);
+            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero);
             dreamers.setExecutor(command);
             dreamers.setTabCompleter(command);
         }
@@ -58,6 +72,12 @@ public final class DreamersPlugin extends JavaPlugin {
         }
         if (tooltips != null) {
             tooltips.disable();
+        }
+        if (appleSkin != null) {
+            appleSkin.disable();
+        }
+        if (xaero != null) {
+            xaero.disable();
         }
     }
 }

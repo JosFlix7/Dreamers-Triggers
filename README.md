@@ -41,6 +41,30 @@ El tótem normal se consigue como siempre. Los cuatro tótems custom salen en el
 
 Con el modo activado, la muerte de un jugador apaga la regeneración natural durante ese tiempo. Si muere otro mientras sigue corriendo, se suma otra vez la misma duración al tiempo que queda. Todos ven una boss bar roja, `Modo UHC por muerte de un jugador`, que se vacía según el tiempo restante. Al llegar a cero, la regeneración vuelve a como estaba.
 
+`/dreamers reload` vuelve a leer `config.yml`.
+
+## Comandos
+
+Quien no es op y no tiene el permiso `dreamers.commands.bypass` solo puede usar los comandos de `commands.allowed`. El tabulador le ofrece únicamente esos. Si prueba otro, ve el texto de `commands.blocked`. Un op puede usar cualquiera. La consola no se bloquea.
+
+`minecraft:tell` cuenta como `tell`. La lista que trae el plugin es la que ya usaba el servidor: `tell`, `msg`, `me` y los de reclamaciones. Al actualizar, si `config.yml` todavía no tiene esa sección, el plugin la añade sin tocar el modo UHC.
+
+## Experiencia embotellada
+
+Con una botella de cristal en la mano principal, el clic derecho en una mesa de encantamientos guarda experiencia: quita 7 puntos, gasta la botella de cristal y entrega una botella de experiencia. Esos 7 puntos son la media que suelta una botella al lanzarla (entre 3 y 11). Si no cabe en el inventario, cae al suelo. La mesa no se abre mientras se sostiene la botella. Si no alcanza la experiencia, el chat avisa en rojo. Cualquier jugador puede hacerlo.
+
+## Hojas
+
+Al talar un tronco, o cuando una hoja empieza a pudrirse, las hojas de alrededor que ya no tienen tronco se rompen en el acto, también en diagonal. Sueltan lo mismo que al pudrirse: brotes, manzanas, palos y el resto del botín de esa hoja. Las hojas colocadas por un jugador no se caen solas.
+
+## Xaero's Minimap
+
+El mod recibe si puede usar las cuevas, las cuevas del Nether y el radar. Quien no tiene una regla propia usa los valores de `xaero` en `config.yml`, que de inicio están permitidos. `/dreamers xm <jugador> <cuevas> <cuevasNether> <radar>` guarda la regla de ese jugador con `true` o `false` y, si está conectado, se la aplica al momento. Sigue valiendo después de reiniciar. `/dreamers reload` vuelve a leer la configuración y la reenvía. El `level-id` que ya usa el servidor se conserva.
+
+## AppleSkin
+
+Quien entra con el mod AppleSkin recibe su saturación, su agotamiento y si el mundo en el que está regenera la vida solo. Así el HUD coincide con el servidor, también cuando el modo UHC por muerte apaga esa regeneración. Quien no tiene el mod no recibe esos datos.
+
 ## Discord
 
 Si DiscordSRV está instalado, las muertes salen en español de México dentro del mismo aviso que ya usa: la cabeza del jugador, su nombre y el mensaje en negrita. Los logros anunciados usan ese mismo aviso dorado. El nombre va en negrita y la descripción, en español de México, en la línea de abajo y en cursiva. Un progreso dice «ha conseguido el progreso», un desafío «ha completado el desafío» y un objetivo «ha alcanzado el objetivo».
@@ -64,4 +88,4 @@ Hace falta JDK 25. Gradle descarga esa versión si el sistema usa otra.
 .\gradlew.bat build
 ```
 
-El jar queda en `build/libs/Dreamers-Triggers-1.5.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3.
+El jar queda en `build/libs/Dreamers-Triggers-1.6.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3. Quita `CommandBlocker` de esa carpeta: este plugin ya bloquea los comandos.
