@@ -1,21 +1,21 @@
 {
   "description": {
-    "text": "Tótem Yunque",
-    "color": "gold",
+    "text": "Tótem Yunque\n",
+    "color": "aqua",
     "italic": false,
     "extra": [
       {
-        "text": "\nOtorga los mismos efectos que un",
+        "text": "Otorga los mismos efectos que un\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nNutritótem al popear y además",
+        "text": "Nutritótem al popear y además\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nrepara tu set completo de armadura.",
+        "text": "repara tu set completo de armadura.",
         "color": "white",
         "italic": false
       }

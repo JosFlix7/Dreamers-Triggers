@@ -1,10 +1,11 @@
 package dev.dreamers;
 
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.Enchantable;
 import io.papermc.paper.datacomponent.item.ItemAttributeModifiers;
+import io.papermc.paper.datacomponent.item.Tool;
 import io.papermc.paper.datacomponent.item.attribute.AttributeModifierDisplay;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -64,7 +65,23 @@ final class ReinforcedNetherite {
             return false;
         }
         return switch (stack.getType()) {
+            case NETHERITE_HELMET, NETHERITE_CHESTPLATE, NETHERITE_LEGGINGS, NETHERITE_BOOTS,
+                    NETHERITE_AXE, NETHERITE_HOE, NETHERITE_PICKAXE, NETHERITE_SHOVEL,
+                    NETHERITE_SWORD, NETHERITE_SPEAR -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean armor(Material type) {
+        return switch (type) {
             case NETHERITE_HELMET, NETHERITE_CHESTPLATE, NETHERITE_LEGGINGS, NETHERITE_BOOTS -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean diggingTool(Material type) {
+        return switch (type) {
+            case NETHERITE_AXE, NETHERITE_HOE, NETHERITE_PICKAXE, NETHERITE_SHOVEL -> true;
             default -> false;
         };
     }
@@ -93,15 +110,35 @@ final class ReinforcedNetherite {
             int doubled = max > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : max * 2;
             result.setData(DataComponentTypes.MAX_DAMAGE, doubled);
         }
-        applyAttributes(result);
-        Component current = result.getData(DataComponentTypes.CUSTOM_NAME);
-        result.setData(
-                DataComponentTypes.CUSTOM_NAME,
-                current == null ? defaultName(result.getType()) : current.color(ItemRarity.EPIC.color())
-        );
-        result.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
+        if (armor(result.getType())) {
+            applyAttributes(result);
+        } else {
+            applyTool(result);
+        }
+        result.setData(DataComponentTypes.ENCHANTABLE, Enchantable.enchantable(20));
         result.editMeta(meta -> meta.getPersistentDataContainer().set(mark, PersistentDataType.BOOLEAN, true));
+        tint(result);
         return result;
+    }
+
+    static boolean tint(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || !reinforced(stack)) {
+            return false;
+        }
+        boolean changed = false;
+        if (stack.getData(DataComponentTypes.RARITY) != ItemRarity.EPIC) {
+            stack.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
+            changed = true;
+        }
+        Component current = stack.getData(DataComponentTypes.CUSTOM_NAME);
+        Component next = current == null
+                ? defaultName(stack.getType())
+                : NameColor.paint(current, ItemRarity.EPIC.color());
+        if (!next.equals(current)) {
+            stack.setData(DataComponentTypes.CUSTOM_NAME, next);
+            changed = true;
+        }
+        return changed;
     }
 
     private static int currentMax(ItemStack stack) {
@@ -120,7 +157,8 @@ final class ReinforcedNetherite {
         boolean already = false;
         if (existing != null && !existing.modifiers().isEmpty()) {
             for (ItemAttributeModifiers.Entry entry : existing.modifiers()) {
-                builder.addModifier(entry.attribute(), entry.modifier(), entry.getGroup(), entry.display());
+                AttributeModifier modifier = toughness(entry.attribute(), entry.modifier(), entry.getGroup());
+                builder.addModifier(entry.attribute(), modifier, entry.getGroup(), entry.display());
                 if (Attribute.ARMOR.equals(entry.attribute())) {
                     keptArmor = true;
                 }
@@ -135,6 +173,7 @@ final class ReinforcedNetherite {
                 for (var entry : type.getDefaultAttributeModifiers().entries()) {
                     AttributeModifier modifier = entry.getValue();
                     EquipmentSlotGroup group = modifier.getSlotGroup() == null ? fallback : modifier.getSlotGroup();
+                    modifier = toughness(entry.getKey(), modifier, group);
                     builder.addModifier(entry.getKey(), modifier, group, AttributeModifierDisplay.reset());
                     if (Attribute.ARMOR.equals(entry.getKey())) {
                         keptArmor = true;
@@ -175,8 +214,16 @@ final class ReinforcedNetherite {
         NamespacedKey id = NamespacedKey.minecraft("armor." + piece);
         AttributeModifier.Operation add = AttributeModifier.Operation.ADD_NUMBER;
         builder.addModifier(Attribute.ARMOR, new AttributeModifier(id, armor, add, group));
-        builder.addModifier(Attribute.ARMOR_TOUGHNESS, new AttributeModifier(id, 3, add, group));
+        builder.addModifier(Attribute.ARMOR_TOUGHNESS, new AttributeModifier(id, 4, add, group));
         builder.addModifier(Attribute.KNOCKBACK_RESISTANCE, new AttributeModifier(id, 0.1, add, group));
+    }
+
+    private static AttributeModifier toughness(Attribute attribute, AttributeModifier modifier, EquipmentSlotGroup group) {
+        if (!Attribute.ARMOR_TOUGHNESS.equals(attribute) || modifier.getAmount() != 3.0) {
+            return modifier;
+        }
+        EquipmentSlotGroup slot = modifier.getSlotGroup() == null ? group : modifier.getSlotGroup();
+        return new AttributeModifier(modifier.getKey(), 4, modifier.getOperation(), slot);
     }
 
     private static EquipmentSlotGroup slot(Material type) {
@@ -206,9 +253,122 @@ final class ReinforcedNetherite {
             case NETHERITE_CHESTPLATE -> "Pechera de Netherita reforzada";
             case NETHERITE_LEGGINGS -> "Pantalones de Netherita reforzada";
             case NETHERITE_BOOTS -> "Botas de Netherita reforzada";
+            case NETHERITE_AXE -> "Hacha de Netherita reforzada";
+            case NETHERITE_HOE -> "Azada de Netherita reforzada";
+            case NETHERITE_PICKAXE -> "Pico de Netherita reforzada";
+            case NETHERITE_SHOVEL -> "Pala de Netherita reforzada";
+            case NETHERITE_SWORD -> "Espada de Netherita reforzada";
+            case NETHERITE_SPEAR -> "Lanza de Netherita reforzada";
             default -> "Netherita reforzada";
         };
-        return Component.text(text, ItemRarity.EPIC.color()).decoration(TextDecoration.ITALIC, false);
+        return NameColor.named(text, ItemRarity.EPIC.color());
+    }
+
+    private static void applyTool(ItemStack result) {
+        boolean mined = diggingTool(result.getType()) && boostMiningSpeed(result);
+        applyToolAttributes(result, !mined);
+    }
+
+    private static boolean boostMiningSpeed(ItemStack result) {
+        Tool tool = result.getData(DataComponentTypes.TOOL);
+        if (tool == null) {
+            ItemType type = result.getType().asItemType();
+            tool = type == null ? null : type.getDefaultData(DataComponentTypes.TOOL);
+        }
+        if (tool == null) {
+            return false;
+        }
+        Tool.Builder builder = Tool.tool()
+                .defaultMiningSpeed(tool.defaultMiningSpeed())
+                .damagePerBlock(tool.damagePerBlock())
+                .canDestroyBlocksInCreative(tool.canDestroyBlocksInCreative());
+        boolean changed = false;
+        for (Tool.Rule rule : tool.rules()) {
+            Float speed = rule.speed();
+            if (speed != null && Float.isFinite(speed)) {
+                builder.addRule(Tool.rule(rule.blocks(), speed + 0.5f, rule.correctForDrops()));
+                changed = true;
+            } else {
+                builder.addRule(rule);
+            }
+        }
+        if (changed) {
+            result.setData(DataComponentTypes.TOOL, builder.build());
+        }
+        return changed;
+    }
+
+    private static void applyToolAttributes(ItemStack result, boolean bumpMiningAttribute) {
+        ItemAttributeModifiers.Builder builder = ItemAttributeModifiers.itemAttributes();
+        ItemAttributeModifiers existing = result.getData(DataComponentTypes.ATTRIBUTE_MODIFIERS);
+        NamespacedKey baseDamage = NamespacedKey.minecraft("base_attack_damage");
+        if (existing != null && !existing.modifiers().isEmpty()) {
+            boolean hasBase = false;
+            for (ItemAttributeModifiers.Entry entry : existing.modifiers()) {
+                if (Attribute.ATTACK_DAMAGE.equals(entry.attribute()) && baseDamage.equals(entry.modifier().getKey())) {
+                    hasBase = true;
+                    break;
+                }
+            }
+            boolean boostedDamage = false;
+            boolean boostedMining = false;
+            for (ItemAttributeModifiers.Entry entry : existing.modifiers()) {
+                AttributeModifier modifier = entry.modifier();
+                boolean damage = Attribute.ATTACK_DAMAGE.equals(entry.attribute())
+                        && !boostedDamage
+                        && (!hasBase || baseDamage.equals(modifier.getKey()));
+                boolean mining = bumpMiningAttribute
+                        && Attribute.MINING_EFFICIENCY.equals(entry.attribute())
+                        && !boostedMining;
+                if (damage) {
+                    modifier = withAmount(modifier, modifier.getAmount() + 1, entry.getGroup());
+                    boostedDamage = true;
+                } else if (mining) {
+                    modifier = withAmount(modifier, modifier.getAmount() + 0.5, entry.getGroup());
+                    boostedMining = true;
+                }
+                builder.addModifier(entry.attribute(), modifier, entry.getGroup(), entry.display());
+            }
+        } else {
+            ItemType type = result.getType().asItemType();
+            if (type == null) {
+                return;
+            }
+            boolean boostedDamage = false;
+            boolean boostedMining = false;
+            boolean hasBase = false;
+            var defaults = type.getDefaultAttributeModifiers().entries();
+            for (var entry : defaults) {
+                if (Attribute.ATTACK_DAMAGE.equals(entry.getKey()) && baseDamage.equals(entry.getValue().getKey())) {
+                    hasBase = true;
+                    break;
+                }
+            }
+            for (var entry : defaults) {
+                AttributeModifier modifier = entry.getValue();
+                EquipmentSlotGroup group = modifier.getSlotGroup() == null ? EquipmentSlotGroup.MAINHAND : modifier.getSlotGroup();
+                boolean damage = Attribute.ATTACK_DAMAGE.equals(entry.getKey())
+                        && !boostedDamage
+                        && (!hasBase || baseDamage.equals(modifier.getKey()));
+                boolean mining = bumpMiningAttribute
+                        && Attribute.MINING_EFFICIENCY.equals(entry.getKey())
+                        && !boostedMining;
+                if (damage) {
+                    modifier = withAmount(modifier, modifier.getAmount() + 1, group);
+                    boostedDamage = true;
+                } else if (mining) {
+                    modifier = withAmount(modifier, modifier.getAmount() + 0.5, group);
+                    boostedMining = true;
+                }
+                builder.addModifier(entry.getKey(), modifier, group, AttributeModifierDisplay.reset());
+            }
+        }
+        result.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, builder.build());
+    }
+
+    private static AttributeModifier withAmount(AttributeModifier modifier, double amount, EquipmentSlotGroup group) {
+        EquipmentSlotGroup slot = modifier.getSlotGroup() == null ? group : modifier.getSlotGroup();
+        return new AttributeModifier(modifier.getKey(), amount, modifier.getOperation(), slot);
     }
 
     private static boolean isRecipe(Recipe crafted) {

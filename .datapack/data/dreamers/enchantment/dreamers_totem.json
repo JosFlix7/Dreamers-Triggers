@@ -1,51 +1,46 @@
 {
   "description": {
-    "text": "Tótem Dreamer",
+    "text": "Tótem Dreamer\n",
     "color": "light_purple",
     "italic": false,
     "extra": [
       {
-        "text": "\nPopea en tu inventario sin necesidad de",
+        "text": "Popea en tu inventario sin necesidad de\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\ntenerlo en tu mano principal o secundaria.",
+        "text": "tenerlo en tu mano principal o secundaria.\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nOtorga 4 segundos de resistencia infinita",
+        "text": "Otorga 4 segundos de resistencia infinita\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nal popear.",
+        "text": "al popear y cuatro corazones extras cuando\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nOtorga cuatro corazones extras cuando",
+        "text": "lo tienes en la mano secundaria.\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nlo tienes en la mano secundaria.",
-        "color": "white",
-        "italic": false
-      },
-      {
-        "text": "\nADVERTENCIA: El juego prioriza usar el",
+        "text": "ADVERTENCIA: El juego prioriza usar el\n",
         "color": "yellow",
         "italic": false
       },
       {
-        "text": "\ntótem que tengas en tu mano principal o",
+        "text": "tótem que tengas en tu mano principal o\n",
         "color": "yellow",
         "italic": false
       },
       {
-        "text": "\nsecundaria antes que este tótem",
+        "text": "secundaria antes que este tótem",
         "color": "yellow",
         "italic": false
       }

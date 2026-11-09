@@ -12,7 +12,7 @@
               "components": {
                 "minecraft:custom_name": {
                   "text": "Nutritótem",
-                  "color": "green",
+                  "color": "yellow",
                   "italic": false
                 },
                 "minecraft:lore": [
@@ -22,12 +22,13 @@
                     "italic": false
                   },
                   {
-                    "text": "para poder escapar de la situación peligrosa.",
+                    "text": "para poder escapar de una situación peligrosa.",
                     "color": "white",
                     "italic": false
                   }
                 ],
                 "minecraft:item_model": "dreamers:nutritotem",
+                "minecraft:rarity": "uncommon",
                 "minecraft:death_protection": {
                   "death_effects": [
                     {

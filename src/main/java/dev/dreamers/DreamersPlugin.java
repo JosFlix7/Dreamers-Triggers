@@ -21,9 +21,9 @@ public final class DreamersPlugin extends JavaPlugin {
         }
         deathUhc = new DeathUhc(this);
         listener = new DreamersListener(this);
-        bundles = new BundleSack(this);
         Enderbag.enable(this);
         ReinforcedNetherite.enable(this);
+        bundles = new BundleSack(this);
         getServer().getPluginManager().registerEvents(listener, this);
         getServer().getPluginManager().registerEvents(deathUhc, this);
         getServer().getPluginManager().registerEvents(bundles, this);

@@ -15,6 +15,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryCreativeEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -80,37 +81,71 @@ final class TotemBooks implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
-        if (event instanceof InventoryCreativeEvent) {
+        if (event instanceof InventoryCreativeEvent || !(event.getWhoClicked() instanceof Player player)) {
             return;
         }
         ItemStack current = event.getCurrentItem();
-        List<ItemStack> totems = expand(current);
-        if (totems != null && event.getClickedInventory() != null) {
-            event.getClickedInventory().setItem(event.getSlot(), totems.get(0));
-            giveRest(event.getClickedInventory(), totems, event.getWhoClicked().getLocation());
-            event.setCurrentItem(totems.get(0));
+        ItemStack cursor = event.getCursor();
+        ItemStack currentTotem = fromBook(current);
+        ItemStack cursorTotem = fromBook(cursor);
+        if (currentTotem == null && cursorTotem == null) {
+            return;
         }
-        List<ItemStack> cursor = expand(event.getCursor());
-        if (cursor != null && event.getWhoClicked() instanceof Player player) {
-            event.getView().setCursor(cursor.get(0));
-            giveRest(player.getInventory(), cursor, player.getLocation());
+        event.setCancelled(true);
+        if (currentTotem != null && event.getClickedInventory() != null) {
+            int amount = Math.max(1, current.getAmount());
+            if (event.isShiftClick()) {
+                event.getClickedInventory().setItem(event.getSlot(), null);
+                placeCopies(player, currentTotem, amount);
+            } else if (cursorTotem != null) {
+                event.getClickedInventory().setItem(event.getSlot(), one(cursorTotem));
+                player.setItemOnCursor(one(currentTotem));
+                placeCopies(player, currentTotem, amount - 1);
+                placeCopies(player, cursorTotem, Math.max(1, cursor.getAmount()) - 1);
+            } else if (cursor == null || cursor.getType().isAir()) {
+                event.getClickedInventory().setItem(event.getSlot(), null);
+                player.setItemOnCursor(one(currentTotem));
+                placeCopies(player, currentTotem, amount - 1);
+            } else {
+                event.getClickedInventory().setItem(event.getSlot(), cursor.clone());
+                player.setItemOnCursor(one(currentTotem));
+                placeCopies(player, currentTotem, amount - 1);
+            }
+            return;
         }
+        int amount = Math.max(1, cursor.getAmount());
+        player.setItemOnCursor(one(cursorTotem));
+        placeCopies(player, cursorTotem, amount - 1);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onCreative(InventoryCreativeEvent event) {
-        ItemStack incoming = event.getCursor();
-        if (incoming == null || incoming.getType().isAir()) {
-            incoming = event.getCurrentItem();
-        }
-        List<ItemStack> totems = expand(incoming);
-        if (totems == null) {
+        ItemStack placed = event.getCursor();
+        ItemStack totem = fromBook(placed);
+        if (totem == null) {
             return;
         }
-        event.getView().setCursor(totems.get(0));
-        if (event.getWhoClicked() instanceof Player player) {
-            giveRest(player.getInventory(), totems, player.getLocation());
+        int amount = Math.max(1, placed.getAmount());
+        event.setCursor(one(totem));
+        if (amount > 1 && event.getWhoClicked() instanceof Player player) {
+            placeCopies(player, totem, amount - 1);
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player) || !plugin.isEnabled()) {
+            return;
+        }
+        replaceCursor(player);
+        replaceInventory(player.getInventory());
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            replaceCursor(player);
+            replaceInventory(player.getInventory());
+        });
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -161,14 +196,30 @@ final class TotemBooks implements Listener {
 
     private static void giveRest(Inventory inventory, List<ItemStack> totems, Location location) {
         for (int index = 1; index < totems.size(); index++) {
-            Map<Integer, ItemStack> leftover = inventory.addItem(totems.get(index));
-            if (location == null || location.getWorld() == null) {
-                continue;
-            }
-            for (ItemStack extra : leftover.values()) {
-                location.getWorld().dropItemNaturally(location, extra);
-            }
+            place(inventory, totems.get(index), location);
         }
+    }
+
+    private static void placeCopies(Player player, ItemStack totem, int amount) {
+        for (int index = 0; index < amount; index++) {
+            place(player.getInventory(), one(totem), player.getLocation());
+        }
+    }
+
+    private static void place(Inventory inventory, ItemStack stack, Location location) {
+        Map<Integer, ItemStack> leftover = inventory.addItem(stack);
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        for (ItemStack extra : leftover.values()) {
+            location.getWorld().dropItemNaturally(location, extra);
+        }
+    }
+
+    private static ItemStack one(ItemStack totem) {
+        ItemStack copy = totem.clone();
+        copy.setAmount(1);
+        return copy;
     }
 
     private static Location locationOf(Inventory inventory) {

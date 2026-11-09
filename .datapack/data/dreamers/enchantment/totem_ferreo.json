@@ -1,26 +1,26 @@
 {
   "description": {
-    "text": "Tótem Férreo",
-    "color": "gray",
+    "text": "Tótem Férreo\n",
+    "color": "aqua",
     "italic": false,
     "extra": [
       {
-        "text": "\nOtorga los mismos efectos que un",
+        "text": "Otorga los mismos efectos que un\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nNutritótem al popear.",
+        "text": "Nutritótem al popear.\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nOtorga dos corazones extras cuando",
+        "text": "Otorga dos corazones extras cuando\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nlo tienes en la mano secundaria",
+        "text": "lo tienes en la mano secundaria",
         "color": "white",
         "italic": false
       }

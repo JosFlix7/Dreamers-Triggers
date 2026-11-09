@@ -1,21 +1,21 @@
 {
   "description": {
-    "text": "Tótem de los no-muertos",
-    "color": "dark_purple",
+    "text": "Tótem de los no-muertos\n",
+    "color": "aqua",
     "italic": false,
     "extra": [
       {
-        "text": "\nTótem que usan los no muertos para",
+        "text": "Tótem que usan los no muertos para\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nvengarse de tí, usarlo a tu favor te traerá",
+        "text": "vengarse de tí, usarlo a tu favor te traerá\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\nconsecuencias...",
+        "text": "consecuencias...",
         "color": "white",
         "italic": false
       }

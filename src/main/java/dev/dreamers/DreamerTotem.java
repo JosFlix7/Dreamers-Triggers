@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -119,13 +120,7 @@ final class DreamerTotem {
     }
 
     static ItemStack dreamer() {
-        ItemStack item = base(
-                "Tótem Dreamer",
-                ItemRarity.EPIC.color(),
-                dreamerLore(),
-                DREAMER_MODEL
-        );
-        item.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
+        ItemStack item = base("Tótem Dreamer", ItemRarity.EPIC, dreamerLore(), DREAMER_MODEL);
         item.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
         item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
         item.editMeta(meta -> meta.getPersistentDataContainer().set(dreamerMark, PersistentDataType.BOOLEAN, true));
@@ -133,32 +128,14 @@ final class DreamerTotem {
     }
 
     static ItemStack nutri() {
-        ItemStack item = base(
-                "Nutritótem",
-                NamedTextColor.GREEN,
-                List.of(
-                        line("Otorga 2 segundos de resistencia infinita"),
-                        line("para poder escapar de una situación peligrosa.")
-                ),
-                NUTRI_MODEL
-        );
+        ItemStack item = base("Nutritótem", ItemRarity.UNCOMMON, nutriLore(), NUTRI_MODEL);
         nutriProtection(item);
         mark(item, "nutri");
         return item;
     }
 
     static ItemStack ferreo() {
-        ItemStack item = base(
-                "Tótem Férreo",
-                NamedTextColor.GRAY,
-                List.of(
-                        line("Otorga los mismos efectos que un"),
-                        line("Nutritótem al popear."),
-                        line("Otorga dos corazones extras cuando"),
-                        line("lo tienes en la mano secundaria")
-                ),
-                FERREO_MODEL
-        );
+        ItemStack item = base("Tótem Férreo", ItemRarity.RARE, ferreoLore(), FERREO_MODEL);
         nutriProtection(item);
         item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.itemAttributes()
                 .addModifier(
@@ -173,32 +150,14 @@ final class DreamerTotem {
     }
 
     static ItemStack yunque() {
-        ItemStack item = base(
-                "Tótem Yunque",
-                NamedTextColor.GOLD,
-                List.of(
-                        line("Otorga los mismos efectos que un"),
-                        line("Nutritótem al popear y además"),
-                        line("repara tu set completo de armadura.")
-                ),
-                YUNQUE_MODEL
-        );
+        ItemStack item = base("Tótem Yunque", ItemRarity.RARE, yunqueLore(), YUNQUE_MODEL);
         nutriProtection(item);
         mark(item, "yunque");
         return item;
     }
 
     static ItemStack undead() {
-        ItemStack item = base(
-                "Tótem de los no-muertos",
-                NamedTextColor.DARK_PURPLE,
-                List.of(
-                        line("Tótem que usan los no muertos para"),
-                        line("vengarse de tí, usarlo a tu favor te traerá"),
-                        line("consecuencias...")
-                ),
-                UNDEAD_MODEL
-        );
+        ItemStack item = base("Tótem de los no-muertos", ItemRarity.RARE, undeadLore(), UNDEAD_MODEL);
         mark(item, "undead");
         return item;
     }
@@ -261,17 +220,89 @@ final class DreamerTotem {
         return Kind.PLAIN;
     }
 
-    static NamedTextColor chatColor(Kind kind) {
-        return switch (kind) {
-            case FERREO, UNDEAD -> NamedTextColor.AQUA;
-            case YUNQUE -> NamedTextColor.GOLD;
-            case DREAMER -> NamedTextColor.LIGHT_PURPLE;
-            default -> NamedTextColor.YELLOW;
-        };
+    static TextColor chatColor(Kind kind) {
+        ItemRarity rarity = rarity(kind);
+        return rarity == null ? ItemRarity.UNCOMMON.color() : rarity.color();
     }
 
     static boolean isDreamer(ItemStack item) {
         return kind(item) == Kind.DREAMER;
+    }
+
+    static boolean tint(ItemStack item) {
+        Kind kind = kind(item);
+        ItemRarity rarity = rarity(kind);
+        if (rarity == null) {
+            return false;
+        }
+        boolean changed = false;
+        if (item.getData(DataComponentTypes.RARITY) != rarity) {
+            item.setData(DataComponentTypes.RARITY, rarity);
+            changed = true;
+        }
+        Component current = item.getData(DataComponentTypes.CUSTOM_NAME);
+        Component next = current == null || isDefaultName(current, kind)
+                ? NameColor.named(defaultText(kind), rarity.color())
+                : NameColor.paint(current, rarity.color());
+        if (!next.equals(current)) {
+            item.setData(DataComponentTypes.CUSTOM_NAME, next);
+            changed = true;
+        }
+        List<Component> expected = lore(kind);
+        if (!loreMatches(item, expected)) {
+            item.setData(DataComponentTypes.LORE, ItemLore.lore(expected));
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static ItemRarity rarity(Kind kind) {
+        return switch (kind) {
+            case NUTRI -> ItemRarity.UNCOMMON;
+            case FERREO, YUNQUE, UNDEAD -> ItemRarity.RARE;
+            case DREAMER -> ItemRarity.EPIC;
+            default -> null;
+        };
+    }
+
+    private static String defaultText(Kind kind) {
+        return switch (kind) {
+            case NUTRI -> "Nutritótem";
+            case FERREO -> "Tótem Férreo";
+            case YUNQUE -> "Tótem Yunque";
+            case UNDEAD -> "Tótem de los no-muertos";
+            case DREAMER -> "Tótem Dreamer";
+            default -> "Tótem";
+        };
+    }
+
+    private static boolean isDefaultName(Component name, Kind kind) {
+        return PlainTextComponentSerializer.plainText().serialize(name).equals(defaultText(kind));
+    }
+
+    private static boolean loreMatches(ItemStack item, List<Component> expected) {
+        ItemLore lore = item.getData(DataComponentTypes.LORE);
+        if (lore == null || lore.lines().size() != expected.size()) {
+            return false;
+        }
+        List<Component> lines = lore.lines();
+        for (int index = 0; index < expected.size(); index++) {
+            if (!expected.get(index).equals(lines.get(index))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<Component> lore(Kind kind) {
+        return switch (kind) {
+            case NUTRI -> nutriLore();
+            case FERREO -> ferreoLore();
+            case YUNQUE -> yunqueLore();
+            case UNDEAD -> undeadLore();
+            case DREAMER -> dreamerLore();
+            default -> List.of();
+        };
     }
 
     static boolean isTotem(ItemStack item) {
@@ -284,16 +315,17 @@ final class DreamerTotem {
             ItemStack item = contents[slot];
             if (isDreamer(item)) {
                 item.setData(DataComponentTypes.ITEM_MODEL, DREAMER_MODEL);
-                item.setData(DataComponentTypes.LORE, ItemLore.lore(dreamerLore()));
                 item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
+                tint(item);
                 player.getInventory().setItem(slot, item);
             }
         }
     }
 
-    private static ItemStack base(String name, TextColor color, List<Component> lore, Key model) {
+    private static ItemStack base(String name, ItemRarity rarity, List<Component> lore, Key model) {
         ItemStack item = ItemStack.of(Material.TOTEM_OF_UNDYING);
-        item.setData(DataComponentTypes.CUSTOM_NAME, Component.text(name, color).decoration(TextDecoration.ITALIC, false));
+        item.setData(DataComponentTypes.CUSTOM_NAME, NameColor.named(name, rarity.color()));
+        item.setData(DataComponentTypes.RARITY, rarity);
         item.setData(DataComponentTypes.LORE, ItemLore.lore(lore));
         item.setData(DataComponentTypes.ITEM_MODEL, model);
         return item;
@@ -363,6 +395,38 @@ final class DreamerTotem {
         }
         Map.Entry<Enchantment, Integer> only = stored.entrySet().iterator().next();
         return only.getValue() > 0 && only.getKey().getKey().equals(Enchantment.MENDING.getKey());
+    }
+
+    private static List<Component> nutriLore() {
+        return List.of(
+                line("Otorga 2 segundos de resistencia infinita"),
+                line("para poder escapar de una situación peligrosa.")
+        );
+    }
+
+    private static List<Component> ferreoLore() {
+        return List.of(
+                line("Otorga los mismos efectos que un"),
+                line("Nutritótem al popear."),
+                line("Otorga dos corazones extras cuando"),
+                line("lo tienes en la mano secundaria")
+        );
+    }
+
+    private static List<Component> yunqueLore() {
+        return List.of(
+                line("Otorga los mismos efectos que un"),
+                line("Nutritótem al popear y además"),
+                line("repara tu set completo de armadura.")
+        );
+    }
+
+    private static List<Component> undeadLore() {
+        return List.of(
+                line("Tótem que usan los no muertos para"),
+                line("vengarse de tí, usarlo a tu favor te traerá"),
+                line("consecuencias...")
+        );
     }
 
     private static List<Component> dreamerLore() {

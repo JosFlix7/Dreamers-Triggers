@@ -6,7 +6,6 @@ import io.papermc.paper.datacomponent.item.ItemContainerContents;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -37,6 +36,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -45,6 +45,7 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.RecipeChoice;
@@ -80,12 +81,9 @@ final class BundleSack implements Listener {
             "Lo que no cupo en el saco se soltó al suelo.",
             NamedTextColor.YELLOW
     );
-    private static final Component MEDIUM_NAME = Component.text("Saco Mediano", NamedTextColor.YELLOW)
-            .decoration(TextDecoration.ITALIC, false);
-    private static final Component LARGE_NAME = Component.text("Saco grande", NamedTextColor.GOLD)
-            .decoration(TextDecoration.ITALIC, false);
-    private static final Component SHULKER_NAME = Component.text("Saco Shulker", NamedTextColor.LIGHT_PURPLE)
-            .decoration(TextDecoration.ITALIC, false);
+    private static final Component MEDIUM_NAME = tierName("Saco Mediano", ItemRarity.UNCOMMON);
+    private static final Component LARGE_NAME = tierName("Saco grande", ItemRarity.RARE);
+    private static final Component SHULKER_NAME = tierName("Saco Shulker", ItemRarity.EPIC);
 
     private final JavaPlugin plugin;
     private final NamespacedKey readyKey;
@@ -330,7 +328,7 @@ final class BundleSack implements Listener {
         player.discoverRecipe(mediumKey);
         player.discoverRecipe(largeKey);
         player.discoverRecipe(shulkerKey);
-        refreshVisible(player.getInventory());
+        refreshCarried(player);
     }
 
     @EventHandler
@@ -371,7 +369,7 @@ final class BundleSack implements Listener {
             return;
         }
         refreshVisible(event.getInventory());
-        refreshVisible(player.getInventory());
+        refreshCarried(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -381,7 +379,7 @@ final class BundleSack implements Listener {
         }
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (player.isOnline()) {
-                refreshVisible(player.getInventory());
+                refreshCarried(player);
             }
         });
     }
@@ -429,23 +427,35 @@ final class BundleSack implements Listener {
         spill(location, loose);
     }
 
+    private void refreshCarried(Player player) {
+        refreshVisible(player.getInventory());
+        ItemStack cursor = player.getItemOnCursor();
+        if (refreshStack(cursor)) {
+            player.setItemOnCursor(cursor);
+        }
+    }
+
     private void refreshVisible(Inventory inventory) {
         for (int slot = 0; slot < inventory.getSize(); slot++) {
             ItemStack stack = inventory.getItem(slot);
-            if (stack != null && updatePreview(stack)) {
-                inventory.setItem(slot, stack);
-            }
+        if (stack != null && refreshStack(stack)) {
+            inventory.setItem(slot, stack);
+        }
         }
     }
 
     private boolean updatePreview(ItemStack stack) {
-        if (!isBundle(stack) || !stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
+        if (!isBundle(stack) || Enderbag.is(stack)) {
             return false;
+        }
+        boolean changed = applyAppearance(stack);
+        if (!stack.getPersistentDataContainer().has(readyKey, PersistentDataType.BYTE)) {
+            return changed;
         }
         ItemStack[] stored = new ItemStack[capacity(stack)];
         read(stack, stored, new ArrayList<>());
         if (previewMatches(stack, stored)) {
-            return false;
+            return changed;
         }
         applyPreview(stack, stored);
         return true;
@@ -584,6 +594,7 @@ final class BundleSack implements Listener {
                 inventory.setItem(index, contents[index]);
             }
         }
+        refreshVisible(inventory);
         open.put(player.getUniqueId(), new Open(id, slot, holder));
         player.openInventory(inventory);
         if (player.getOpenInventory().getTopInventory().getHolder(false) != holder) {
@@ -685,8 +696,21 @@ final class BundleSack implements Listener {
         return false;
     }
 
+    @EventHandler
+    public void onAnvil(PrepareAnvilEvent event) {
+        ItemStack result = event.getResult();
+        if (result == null || !isBundle(result)) {
+            return;
+        }
+        ItemStack next = result.clone();
+        if (refreshStack(next)) {
+            event.setResult(next);
+        }
+    }
+
     private Prepared prepare(ItemStack source) {
         ItemStack stack = source.clone();
+        applyAppearance(stack);
         UUID id = id(stack);
         if (id == null) {
             id = UUID.randomUUID();
@@ -1062,31 +1086,32 @@ final class BundleSack implements Listener {
         Bukkit.removeRecipe(largeKey);
         Bukkit.removeRecipe(shulkerKey);
 
-        ShapedRecipe medium = new ShapedRecipe(mediumKey, tierItem(18, MEDIUM_NAME, false));
+        ShapedRecipe medium = new ShapedRecipe(mediumKey, tierItem(18, false));
         medium.shape("DCD", "DSD", "DDD");
         medium.setIngredient('D', Material.DIAMOND);
         medium.setIngredient('C', Material.CHEST);
         medium.setIngredient('S', sackChoice(9, ItemStack.of(Material.BUNDLE)));
         Bukkit.addRecipe(medium);
 
-        ShapedRecipe large = new ShapedRecipe(largeKey, tierItem(27, LARGE_NAME, false));
+        ShapedRecipe large = new ShapedRecipe(largeKey, tierItem(27, false));
         large.shape("CDC", "DSD", "DDD");
         large.setIngredient('D', Material.DIAMOND);
         large.setIngredient('C', Material.CHEST);
-        large.setIngredient('S', sackChoice(18, tierItem(18, MEDIUM_NAME, false)));
+        large.setIngredient('S', sackChoice(18, tierItem(18, false)));
         Bukkit.addRecipe(large);
 
-        ShapedRecipe shulker = new ShapedRecipe(shulkerKey, tierItem(54, SHULKER_NAME, true));
+        ShapedRecipe shulker = new ShapedRecipe(shulkerKey, tierItem(54, true));
         shulker.shape("DHD", "DSD", "DDD");
         shulker.setIngredient('D', Material.DIAMOND);
         shulker.setIngredient('H', emptyShulker());
-        shulker.setIngredient('S', sackChoice(27, tierItem(27, LARGE_NAME, false)));
+        shulker.setIngredient('S', sackChoice(27, tierItem(27, false)));
         Bukkit.addRecipe(shulker);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.discoverRecipe(mediumKey);
             player.discoverRecipe(largeKey);
             player.discoverRecipe(shulkerKey);
+            refreshCarried(player);
         }
     }
 
@@ -1125,13 +1150,13 @@ final class BundleSack implements Listener {
 
     private Upgrade upgradeFor(NamespacedKey key) {
         if (mediumKey.equals(key)) {
-            return new Upgrade(9, 18, MEDIUM_NAME, false);
+            return new Upgrade(9, 18, false);
         }
         if (largeKey.equals(key)) {
-            return new Upgrade(18, 27, LARGE_NAME, false);
+            return new Upgrade(18, 27, false);
         }
         if (shulkerKey.equals(key)) {
-            return new Upgrade(27, 54, SHULKER_NAME, true);
+            return new Upgrade(27, 54, true);
         }
         return null;
     }
@@ -1152,24 +1177,74 @@ final class BundleSack implements Listener {
         ItemStack result = source.clone();
         result.setAmount(1);
         result.editMeta(meta -> meta.getPersistentDataContainer().set(sizeKey, PersistentDataType.BYTE, (byte) upgrade.to));
-        Component current = result.getData(DataComponentTypes.CUSTOM_NAME);
-        if (current == null || isTierName(current)) {
-            result.setData(DataComponentTypes.CUSTOM_NAME, upgrade.name);
-        }
+        applyAppearance(result);
         if (upgrade.glint) {
             result.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
         }
         return result;
     }
 
-    private ItemStack tierItem(int size, Component name, boolean glint) {
+    private ItemStack tierItem(int size, boolean glint) {
         ItemStack stack = ItemStack.of(Material.BUNDLE);
         stack.editMeta(meta -> meta.getPersistentDataContainer().set(sizeKey, PersistentDataType.BYTE, (byte) size));
-        stack.setData(DataComponentTypes.CUSTOM_NAME, name);
+        applyAppearance(stack);
         if (glint) {
             stack.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
         }
         return stack;
+    }
+
+    private boolean refreshStack(ItemStack stack) {
+        return updatePreview(stack)
+                | ReinforcedNetherite.tint(stack)
+                | DreamerTotem.tint(stack)
+                | Enderbag.tint(stack);
+    }
+
+    private boolean applyAppearance(ItemStack stack) {
+        if (!isBundle(stack) || Enderbag.is(stack)) {
+            return false;
+        }
+        ItemRarity rarity = tierRarity(capacity(stack));
+        if (rarity == null) {
+            return false;
+        }
+        boolean changed = false;
+        if (stack.getData(DataComponentTypes.RARITY) != rarity) {
+            stack.setData(DataComponentTypes.RARITY, rarity);
+            changed = true;
+        }
+        Component current = stack.getData(DataComponentTypes.CUSTOM_NAME);
+        Component next = current == null || isTierName(current)
+                ? nameFor(capacity(stack))
+                : NameColor.paint(current, rarity.color());
+        if (next != null && !next.equals(current)) {
+            stack.setData(DataComponentTypes.CUSTOM_NAME, next);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static ItemRarity tierRarity(int size) {
+        return switch (size) {
+            case 18 -> ItemRarity.UNCOMMON;
+            case 27 -> ItemRarity.RARE;
+            case 54 -> ItemRarity.EPIC;
+            default -> null;
+        };
+    }
+
+    private static Component nameFor(int size) {
+        return switch (size) {
+            case 18 -> MEDIUM_NAME;
+            case 27 -> LARGE_NAME;
+            case 54 -> SHULKER_NAME;
+            default -> null;
+        };
+    }
+
+    private static Component tierName(String text, ItemRarity rarity) {
+        return NameColor.named(text, rarity.color());
     }
 
     private int capacity(ItemStack stack) {
@@ -1192,7 +1267,7 @@ final class BundleSack implements Listener {
         return text.equals("Saco Mediano") || text.equals("Saco grande") || text.equals("Saco Shulker");
     }
 
-    private record Upgrade(int from, int to, Component name, boolean glint) {
+    private record Upgrade(int from, int to, boolean glint) {
     }
 
     private static final class Open {

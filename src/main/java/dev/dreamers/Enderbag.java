@@ -3,8 +3,6 @@ package dev.dreamers;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
@@ -29,6 +27,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
@@ -39,6 +38,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 final class Enderbag {
     static final Key MODEL = Key.key("dreamers", "enderbag");
+    private static final Component NAME = NameColor.named("Enderbag", ItemRarity.EPIC.color());
 
     private static NamespacedKey recipe;
     private static NamespacedKey sackItems;
@@ -92,10 +92,8 @@ final class Enderbag {
 
     private static ItemStack item() {
         ItemStack stack = ItemStack.of(Material.ENDER_CHEST);
-        stack.setData(
-                DataComponentTypes.CUSTOM_NAME,
-                Component.text("Enderbag", NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false)
-        );
+        stack.setData(DataComponentTypes.CUSTOM_NAME, NAME);
+        stack.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
         stack.setData(DataComponentTypes.ITEM_MODEL, MODEL);
         stack.setData(DataComponentTypes.MAX_STACK_SIZE, 1);
         return stack;
@@ -109,9 +107,27 @@ final class Enderbag {
         next.setAmount(stack.getAmount());
         Component name = stack.getData(DataComponentTypes.CUSTOM_NAME);
         if (name != null) {
-            next.setData(DataComponentTypes.CUSTOM_NAME, name);
+            next.setData(DataComponentTypes.CUSTOM_NAME, NameColor.paint(name, ItemRarity.EPIC.color()));
         }
         return next;
+    }
+
+    static boolean tint(ItemStack stack) {
+        if (!current(stack)) {
+            return false;
+        }
+        boolean changed = false;
+        if (stack.getData(DataComponentTypes.RARITY) != ItemRarity.EPIC) {
+            stack.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);
+            changed = true;
+        }
+        Component currentName = stack.getData(DataComponentTypes.CUSTOM_NAME);
+        Component next = currentName == null ? NAME : NameColor.paint(currentName, ItemRarity.EPIC.color());
+        if (!next.equals(currentName)) {
+            stack.setData(DataComponentTypes.CUSTOM_NAME, next);
+            changed = true;
+        }
+        return changed;
     }
 
     private static RecipeChoice emptySack() {

@@ -1,16 +1,16 @@
 {
   "description": {
-    "text": "Nutritótem",
-    "color": "green",
+    "text": "Nutritótem\n",
+    "color": "yellow",
     "italic": false,
     "extra": [
       {
-        "text": "\nOtorga 2 segundos de resistencia infinita",
+        "text": "Otorga 2 segundos de resistencia infinita\n",
         "color": "white",
         "italic": false
       },
       {
-        "text": "\npara poder escapar de la situación peligrosa.",
+        "text": "para poder escapar de una situación peligrosa.",
         "color": "white",
         "italic": false
       }
