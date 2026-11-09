@@ -90,7 +90,7 @@ final class Enderbag {
         player.openInventory(player.getEnderChest());
     }
 
-    private static ItemStack item() {
+    static ItemStack item() {
         ItemStack stack = ItemStack.of(Material.ENDER_CHEST);
         stack.setData(DataComponentTypes.CUSTOM_NAME, NAME);
         stack.setData(DataComponentTypes.RARITY, ItemRarity.EPIC);

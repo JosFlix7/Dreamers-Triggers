@@ -32,7 +32,6 @@ public final class DreamersPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(listener, this);
         getServer().getPluginManager().registerEvents(deathUhc, this);
         getServer().getPluginManager().registerEvents(bundles, this);
-        getServer().getPluginManager().registerEvents(new TotemBooks(this), this);
         getServer().getPluginManager().registerEvents(new WardenLoot(), this);
         getServer().getPluginManager().registerEvents(new NetheriteHostiles(), this);
         getServer().getPluginManager().registerEvents(new XpBottling(), this);
@@ -48,7 +47,7 @@ public final class DreamersPlugin extends JavaPlugin {
         xaero.enable();
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
-            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero);
+            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles));
             dreamers.setExecutor(command);
             dreamers.setTabCompleter(command);
         }

@@ -1196,6 +1196,10 @@ final class BundleSack implements Listener {
         return result;
     }
 
+    ItemStack customSack(int size, boolean glint) {
+        return tierItem(size, glint);
+    }
+
     private ItemStack tierItem(int size, boolean glint) {
         ItemStack stack = ItemStack.of(Material.BUNDLE);
         stack.editMeta(meta -> meta.getPersistentDataContainer().set(sizeKey, PersistentDataType.BYTE, (byte) size));

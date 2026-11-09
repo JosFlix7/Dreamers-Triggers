@@ -103,6 +103,13 @@ final class ReinforcedNetherite {
         return null;
     }
 
+    static ItemStack reinforced(Material type) {
+        if (!isGear(type)) {
+            return null;
+        }
+        return reinforce(ItemStack.of(type));
+    }
+
     private static ItemStack reinforce(ItemStack source) {
         ItemStack result = source.clone();
         result.setAmount(1);

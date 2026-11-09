@@ -2,7 +2,7 @@
 
 Plugin de Paper para Minecraft 26.3. Avisa a todo el servidor cuando un jugador muere o cuando un tótem de la resurrección lo salva.
 
-`.datapack` es el datapack que mete los tótems en el creativo. Cárgalo junto con el plugin. `.datapack_old` es la versión anterior: no la cargues, porque anunciaría otra vez la muerte y el tótem.
+`.datapack_old` es un datapack anterior: no lo cargues, porque anunciaría otra vez la muerte y el tótem. Los objetos custom no salen en el creativo. Un operador los entrega con `/dreamers give`.
 
 ## Muerte
 
@@ -33,7 +33,7 @@ El sonido `dreamers:dreamers.effect_bell` solo lo oye quien consumió un tótem 
 - **Tótem de los no-muertos:** el sonido vanilla del tótem, más grave (tono 0.75). En un mob no-muerto se porta como un tótem y, durante 1 segundo, aplica Wither I por 3 segundos en un área de 3×3 a su alrededor. Si lo usa un jugador, queda a 1 de vida, con Wither I (45 s), Debilidad II (40 s), Fatiga minera I (15 s) y la saturación al máximo. Las variantes de zombi y de esqueleto tienen un 15% de aparecer con uno en la otra mano y un 5% de soltar uno al morir. En supervivencia ese drop es la única forma de conseguirlo.
 - **Tótem Dreamer:** `dreamers:dreamers.totem`. Sigue popeando desde el inventario. En supervivencia solo se craftea, con un tótem normal en el centro: diamante, fragmento de amatista y diamante arriba y abajo; tótem, ojo de ender y tótem en medio.
 
-El tótem normal se consigue como siempre. Los cuatro tótems custom salen en el creativo de Java junto a los libros encantados, con la textura del tótem. Al tomarlos, el datapack `.datapack` los cambia al momento por un tótem de la resurrección. Hay que cargar ese datapack junto con el plugin. En Bedrock, Geyser los muestra en la categoría de equipo.
+El tótem normal se consigue como siempre. Los tótems custom se craftean, y el de los no-muertos lo sueltan zombis y esqueletos. No aparecen en el creativo.
 
 ## Modo UHC por muerte
 
@@ -42,6 +42,8 @@ El tótem normal se consigue como siempre. Los cuatro tótems custom salen en el
 Con el modo activado, la muerte de un jugador apaga la regeneración natural durante ese tiempo. Si muere otro mientras sigue corriendo, se suma otra vez la misma duración al tiempo que queda. Todos ven una boss bar roja, `Modo UHC por muerte de un jugador`, que se vacía según el tiempo restante. Al llegar a cero, la regeneración vuelve a como estaba.
 
 `/dreamers reload` vuelve a leer `config.yml`.
+
+`/dreamers give <jugador> <objeto> <cantidad>` le entrega un objeto custom a un jugador conectado. La cantidad va de 1 a 99. Solo lo puede usar un operador o la consola. Los objetos son `nutritotem`, `totem_ferreo`, `totem_yunque`, `totem_dreamer`, `totem_no_muertos`, `enderbag`, `saco_mediano`, `saco_grande`, `saco_shulker`, `reforzada_casco`, `reforzada_pechera`, `reforzada_pantalones`, `reforzada_botas`, `reforzada_hacha`, `reforzada_azada`, `reforzada_pico`, `reforzada_pala`, `reforzada_espada` y `reforzada_lanza`. El tabulador los lista.
 
 ## Comandos
 
@@ -88,4 +90,4 @@ Hace falta JDK 25. Gradle descarga esa versión si el sistema usa otra.
 .\gradlew.bat build
 ```
 
-El jar queda en `build/libs/Dreamers-Triggers-1.6.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3. Quita `CommandBlocker` de esa carpeta: este plugin ya bloquea los comandos.
+El jar queda en `build/libs/Dreamers-Triggers-1.6.1.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3. Quita `CommandBlocker` de esa carpeta: este plugin ya bloquea los comandos.

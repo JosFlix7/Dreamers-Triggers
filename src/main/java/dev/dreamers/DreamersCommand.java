@@ -9,23 +9,26 @@ import org.bukkit.command.TabCompleter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 final class DreamersCommand implements CommandExecutor, TabCompleter {
-    private static final String USAGE = "/dreamers DeathUCH <on|off|time> | /dreamers reload | " + XaeroMaps.USAGE;
-    private static final List<String> ROOT = List.of("DeathUCH", "reload", "xm");
+    private static final String USAGE = "/dreamers DeathUCH <on|off|time> | /dreamers reload | "
+            + XaeroMaps.USAGE + " | " + CustomItems.USAGE;
     private static final List<String> ACTIONS = List.of("on", "off", "time");
     private static final List<String> BOOLEANS = List.of("true", "false");
 
     private final DeathUhc uhc;
     private final CommandFilter commands;
     private final XaeroMaps xaero;
+    private final CustomItems items;
 
-    DreamersCommand(DeathUhc uhc, CommandFilter commands, XaeroMaps xaero) {
+    DreamersCommand(DeathUhc uhc, CommandFilter commands, XaeroMaps xaero, CustomItems items) {
         this.uhc = uhc;
         this.commands = commands;
         this.xaero = xaero;
+        this.items = items;
     }
 
     @Override
@@ -49,6 +52,10 @@ final class DreamersCommand implements CommandExecutor, TabCompleter {
             xaero.command(sender, args);
             return true;
         }
+        if (args[0].equalsIgnoreCase("give")) {
+            items.give(sender, args);
+            return true;
+        }
         if (!args[0].equalsIgnoreCase("DeathUCH")) {
             usage(sender);
             return true;
@@ -64,7 +71,14 @@ final class DreamersCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 1) {
             String prefix = args[0].toLowerCase(Locale.ROOT);
-            return ROOT.stream().filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+            List<String> options = new ArrayList<>(List.of("DeathUCH", "reload", "xm"));
+            if (CustomItems.canGive(sender)) {
+                options.add("give");
+            }
+            return options.stream().filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+        }
+        if (args[0].equalsIgnoreCase("give")) {
+            return items.complete(sender, args);
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("DeathUCH")) {
             String prefix = args[1].toLowerCase(Locale.ROOT);
