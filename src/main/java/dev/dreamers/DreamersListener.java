@@ -9,13 +9,11 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.kyori.adventure.title.Title;
 import net.kyori.adventure.translation.GlobalTranslator;
-import io.papermc.paper.registry.keys.tags.EntityTypeTagKeys;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
-import org.bukkit.Registry;
 import org.bukkit.SoundCategory;
 import org.bukkit.Statistic;
 import org.bukkit.attribute.Attribute;
@@ -447,12 +445,12 @@ final class DreamersListener implements Listener {
     }
 
     private static boolean isUndead(LivingEntity entity) {
-        return Registry.ENTITY_TYPE.getTagValues(EntityTypeTagKeys.UNDEAD).contains(entity.getType());
+        return Tag.ENTITY_TYPES_UNDEAD.isTagged(entity.getType());
     }
 
     private static boolean isZombieOrSkeleton(LivingEntity entity) {
-        return Registry.ENTITY_TYPE.getTagValues(EntityTypeTagKeys.ZOMBIES).contains(entity.getType())
-                || Registry.ENTITY_TYPE.getTagValues(EntityTypeTagKeys.SKELETONS).contains(entity.getType());
+        var type = entity.getType();
+        return Tag.ENTITY_TYPES_ZOMBIES.isTagged(type) || Tag.ENTITY_TYPES_SKELETONS.isTagged(type);
     }
 
     private static Held heldTotem(LivingEntity entity) {

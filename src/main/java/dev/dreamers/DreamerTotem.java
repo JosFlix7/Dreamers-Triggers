@@ -3,6 +3,7 @@ package dev.dreamers;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.DeathProtection;
 import io.papermc.paper.datacomponent.item.ItemAttributeModifiers;
+import io.papermc.paper.datacomponent.item.ItemEnchantments;
 import io.papermc.paper.datacomponent.item.ItemLore;
 import io.papermc.paper.datacomponent.item.attribute.AttributeModifierDisplay;
 import io.papermc.paper.datacomponent.item.consumable.ConsumeEffect;
@@ -25,8 +26,6 @@ import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.meta.EnchantmentStorageMeta;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -52,6 +51,41 @@ final class DreamerTotem {
     private static final Key UNDEAD_MODEL = Key.key("dreamers", "totem_of_undeads");
     private static final NamespacedKey FERREO_HEALTH = new NamespacedKey("dreamers", "totem_ferreo_health");
     private static final NamespacedKey DREAMER_HEALTH = new NamespacedKey("dreamers", "totem_dreamer_health");
+    private static final Component NUTRI_NAME = NameColor.named("Nutritótem", ItemRarity.UNCOMMON.color());
+    private static final Component FERREO_NAME = NameColor.named("Tótem Férreo", ItemRarity.RARE.color());
+    private static final Component YUNQUE_NAME = NameColor.named("Tótem Yunque", ItemRarity.RARE.color());
+    private static final Component UNDEAD_NAME = NameColor.named("Tótem de los no-muertos", ItemRarity.RARE.color());
+    private static final Component DREAMER_NAME = NameColor.named("Tótem Dreamer", ItemRarity.EPIC.color());
+    private static final List<Component> NUTRI_LORE = List.of(
+            line("Otorga 2 segundos de resistencia infinita"),
+            line("para poder escapar de una situación peligrosa.")
+    );
+    private static final List<Component> FERREO_LORE = List.of(
+            line("Otorga los mismos efectos que un"),
+            line("Nutritótem al popear."),
+            line("Otorga dos corazones extras cuando"),
+            line("lo tienes en la mano secundaria")
+    );
+    private static final List<Component> YUNQUE_LORE = List.of(
+            line("Otorga los mismos efectos que un"),
+            line("Nutritótem al popear y además"),
+            line("repara tu set completo de armadura.")
+    );
+    private static final List<Component> UNDEAD_LORE = List.of(
+            line("Tótem que usan los no muertos para"),
+            line("vengarse de tí, usarlo a tu favor te traerá"),
+            line("consecuencias...")
+    );
+    private static final List<Component> DREAMER_LORE = List.of(
+            line("Popea en tu inventario sin necesidad de"),
+            line("tenerlo en tu mano principal o secundaria."),
+            line("Otorga 4 segundos de resistencia infinita"),
+            line("al popear y cuatro corazones extras cuando"),
+            line("lo tienes en la mano secundaria."),
+            line("ADVERTENCIA: El juego prioriza usar el", NamedTextColor.YELLOW),
+            line("tótem que tengas en tu mano principal o", NamedTextColor.YELLOW),
+            line("secundaria antes que este tótem", NamedTextColor.YELLOW)
+    );
 
     private static NamespacedKey dreamerMark;
     private static NamespacedKey typeMark;
@@ -120,7 +154,7 @@ final class DreamerTotem {
     }
 
     static ItemStack dreamer() {
-        ItemStack item = base("Tótem Dreamer", ItemRarity.EPIC, dreamerLore(), DREAMER_MODEL);
+        ItemStack item = base(DREAMER_NAME, ItemRarity.EPIC, DREAMER_LORE, DREAMER_MODEL);
         item.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
         item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
         item.editMeta(meta -> meta.getPersistentDataContainer().set(dreamerMark, PersistentDataType.BOOLEAN, true));
@@ -128,14 +162,14 @@ final class DreamerTotem {
     }
 
     static ItemStack nutri() {
-        ItemStack item = base("Nutritótem", ItemRarity.UNCOMMON, nutriLore(), NUTRI_MODEL);
+        ItemStack item = base(NUTRI_NAME, ItemRarity.UNCOMMON, NUTRI_LORE, NUTRI_MODEL);
         nutriProtection(item);
         mark(item, "nutri");
         return item;
     }
 
     static ItemStack ferreo() {
-        ItemStack item = base("Tótem Férreo", ItemRarity.RARE, ferreoLore(), FERREO_MODEL);
+        ItemStack item = base(FERREO_NAME, ItemRarity.RARE, FERREO_LORE, FERREO_MODEL);
         nutriProtection(item);
         item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.itemAttributes()
                 .addModifier(
@@ -150,14 +184,14 @@ final class DreamerTotem {
     }
 
     static ItemStack yunque() {
-        ItemStack item = base("Tótem Yunque", ItemRarity.RARE, yunqueLore(), YUNQUE_MODEL);
+        ItemStack item = base(YUNQUE_NAME, ItemRarity.RARE, YUNQUE_LORE, YUNQUE_MODEL);
         nutriProtection(item);
         mark(item, "yunque");
         return item;
     }
 
     static ItemStack undead() {
-        ItemStack item = base("Tótem de los no-muertos", ItemRarity.RARE, undeadLore(), UNDEAD_MODEL);
+        ItemStack item = base(UNDEAD_NAME, ItemRarity.RARE, UNDEAD_LORE, UNDEAD_MODEL);
         mark(item, "undead");
         return item;
     }
@@ -181,23 +215,27 @@ final class DreamerTotem {
             return Kind.PLAIN;
         }
         if (dreamerMark != null) {
-            ItemMeta meta = item.getItemMeta();
-            if (meta != null) {
-                if (meta.getPersistentDataContainer().has(dreamerMark, PersistentDataType.BOOLEAN)) {
-                    return Kind.DREAMER;
-                }
-                String type = meta.getPersistentDataContainer().get(typeMark, PersistentDataType.STRING);
-                if ("nutri".equals(type)) {
-                    return Kind.NUTRI;
-                }
-                if ("ferreo".equals(type)) {
-                    return Kind.FERREO;
-                }
-                if ("yunque".equals(type)) {
-                    return Kind.YUNQUE;
-                }
-                if ("undead".equals(type)) {
-                    return Kind.UNDEAD;
+            var data = item.getPersistentDataContainer();
+            if (data.has(dreamerMark, PersistentDataType.BOOLEAN)) {
+                return Kind.DREAMER;
+            }
+            String type = data.get(typeMark, PersistentDataType.STRING);
+            if (type != null) {
+                switch (type) {
+                    case "nutri" -> {
+                        return Kind.NUTRI;
+                    }
+                    case "ferreo" -> {
+                        return Kind.FERREO;
+                    }
+                    case "yunque" -> {
+                        return Kind.YUNQUE;
+                    }
+                    case "undead" -> {
+                        return Kind.UNDEAD;
+                    }
+                    default -> {
+                    }
                 }
             }
         }
@@ -230,7 +268,10 @@ final class DreamerTotem {
     }
 
     static boolean tint(ItemStack item) {
-        Kind kind = kind(item);
+        return tint(item, kind(item));
+    }
+
+    private static boolean tint(ItemStack item, Kind kind) {
         ItemRarity rarity = rarity(kind);
         if (rarity == null) {
             return false;
@@ -242,7 +283,7 @@ final class DreamerTotem {
         }
         Component current = item.getData(DataComponentTypes.CUSTOM_NAME);
         Component next = current == null || isDefaultName(current, kind)
-                ? NameColor.named(defaultText(kind), rarity.color())
+                ? defaultName(kind)
                 : NameColor.paint(current, rarity.color());
         if (!next.equals(current)) {
             item.setData(DataComponentTypes.CUSTOM_NAME, next);
@@ -262,6 +303,17 @@ final class DreamerTotem {
             case FERREO, YUNQUE, UNDEAD -> ItemRarity.RARE;
             case DREAMER -> ItemRarity.EPIC;
             default -> null;
+        };
+    }
+
+    private static Component defaultName(Kind kind) {
+        return switch (kind) {
+            case NUTRI -> NUTRI_NAME;
+            case FERREO -> FERREO_NAME;
+            case YUNQUE -> YUNQUE_NAME;
+            case UNDEAD -> UNDEAD_NAME;
+            case DREAMER -> DREAMER_NAME;
+            default -> NUTRI_NAME;
         };
     }
 
@@ -296,11 +348,11 @@ final class DreamerTotem {
 
     private static List<Component> lore(Kind kind) {
         return switch (kind) {
-            case NUTRI -> nutriLore();
-            case FERREO -> ferreoLore();
-            case YUNQUE -> yunqueLore();
-            case UNDEAD -> undeadLore();
-            case DREAMER -> dreamerLore();
+            case NUTRI -> NUTRI_LORE;
+            case FERREO -> FERREO_LORE;
+            case YUNQUE -> YUNQUE_LORE;
+            case UNDEAD -> UNDEAD_LORE;
+            case DREAMER -> DREAMER_LORE;
             default -> List.of();
         };
     }
@@ -313,18 +365,20 @@ final class DreamerTotem {
         ItemStack[] contents = player.getInventory().getContents();
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack item = contents[slot];
-            if (isDreamer(item)) {
-                item.setData(DataComponentTypes.ITEM_MODEL, DREAMER_MODEL);
-                item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
-                tint(item);
-                player.getInventory().setItem(slot, item);
+            Kind found = kind(item);
+            if (found != Kind.DREAMER) {
+                continue;
             }
+            item.setData(DataComponentTypes.ITEM_MODEL, DREAMER_MODEL);
+            item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, dreamerAttributes());
+            tint(item, found);
+            player.getInventory().setItem(slot, item);
         }
     }
 
-    private static ItemStack base(String name, ItemRarity rarity, List<Component> lore, Key model) {
+    private static ItemStack base(Component name, ItemRarity rarity, List<Component> lore, Key model) {
         ItemStack item = ItemStack.of(Material.TOTEM_OF_UNDYING);
-        item.setData(DataComponentTypes.CUSTOM_NAME, NameColor.named(name, rarity.color()));
+        item.setData(DataComponentTypes.CUSTOM_NAME, name);
         item.setData(DataComponentTypes.RARITY, rarity);
         item.setData(DataComponentTypes.LORE, ItemLore.lore(lore));
         item.setData(DataComponentTypes.ITEM_MODEL, model);
@@ -374,11 +428,10 @@ final class DreamerTotem {
 
     private static RecipeChoice mendingBook() {
         ItemStack book = ItemStack.of(Material.ENCHANTED_BOOK);
-        book.editMeta(meta -> {
-            if (meta instanceof EnchantmentStorageMeta stored) {
-                stored.addStoredEnchant(Enchantment.MENDING, 1, true);
-            }
-        });
+        book.setData(
+                DataComponentTypes.STORED_ENCHANTMENTS,
+                ItemEnchantments.itemEnchantments(Map.of(Enchantment.MENDING, 1))
+        );
         return RecipeChoice.predicateChoice(DreamerTotem::onlyMending, book);
     }
 
@@ -386,60 +439,17 @@ final class DreamerTotem {
         if (item == null || item.getType() != Material.ENCHANTED_BOOK) {
             return false;
         }
-        if (!(item.getItemMeta() instanceof EnchantmentStorageMeta meta)) {
+        ItemEnchantments stored = item.getData(DataComponentTypes.STORED_ENCHANTMENTS);
+        if (stored == null) {
             return false;
         }
-        Map<Enchantment, Integer> stored = meta.getStoredEnchants();
-        if (stored.size() != 1) {
+        Map<Enchantment, Integer> enchants = stored.enchantments();
+        if (enchants.size() != 1) {
             return false;
         }
-        Map.Entry<Enchantment, Integer> only = stored.entrySet().iterator().next();
-        return only.getValue() > 0 && only.getKey().getKey().equals(Enchantment.MENDING.getKey());
-    }
-
-    private static List<Component> nutriLore() {
-        return List.of(
-                line("Otorga 2 segundos de resistencia infinita"),
-                line("para poder escapar de una situación peligrosa.")
-        );
-    }
-
-    private static List<Component> ferreoLore() {
-        return List.of(
-                line("Otorga los mismos efectos que un"),
-                line("Nutritótem al popear."),
-                line("Otorga dos corazones extras cuando"),
-                line("lo tienes en la mano secundaria")
-        );
-    }
-
-    private static List<Component> yunqueLore() {
-        return List.of(
-                line("Otorga los mismos efectos que un"),
-                line("Nutritótem al popear y además"),
-                line("repara tu set completo de armadura.")
-        );
-    }
-
-    private static List<Component> undeadLore() {
-        return List.of(
-                line("Tótem que usan los no muertos para"),
-                line("vengarse de tí, usarlo a tu favor te traerá"),
-                line("consecuencias...")
-        );
-    }
-
-    private static List<Component> dreamerLore() {
-        return List.of(
-                line("Popea en tu inventario sin necesidad de"),
-                line("tenerlo en tu mano principal o secundaria."),
-                line("Otorga 4 segundos de resistencia infinita"),
-                line("al popear y cuatro corazones extras cuando"),
-                line("lo tienes en la mano secundaria."),
-                line("ADVERTENCIA: El juego prioriza usar el", NamedTextColor.YELLOW),
-                line("tótem que tengas en tu mano principal o", NamedTextColor.YELLOW),
-                line("secundaria antes que este tótem", NamedTextColor.YELLOW)
-        );
+        Map.Entry<Enchantment, Integer> only = enchants.entrySet().iterator().next();
+        Integer level = only.getValue();
+        return level != null && level > 0 && only.getKey().getKey().equals(Enchantment.MENDING.getKey());
     }
 
     private static ItemAttributeModifiers dreamerAttributes() {

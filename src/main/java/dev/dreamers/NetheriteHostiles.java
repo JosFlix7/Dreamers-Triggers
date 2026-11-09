@@ -2,16 +2,18 @@ package dev.dreamers;
 
 import org.bukkit.GameMode;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.BoundingBox;
 
-import java.util.Collection;
 import java.util.concurrent.ThreadLocalRandom;
 
 final class NetheriteHostiles implements Listener {
@@ -41,7 +43,11 @@ final class NetheriteHostiles implements Listener {
         if (!(event.getEntity() instanceof Enemy enemy)) {
             return;
         }
-        double pieces = weightedPieces(enemy.getWorld().getNearbyPlayers(enemy.getLocation(), RANGE));
+        World world = enemy.getWorld();
+        if (world.getPlayerCount() == 0) {
+            return;
+        }
+        double pieces = weightedPieces(world, enemy.getX(), enemy.getY(), enemy.getZ());
         if (pieces <= 0) {
             return;
         }
@@ -54,11 +60,12 @@ final class NetheriteHostiles implements Listener {
         }
     }
 
-    private static double weightedPieces(Collection<Player> nearby) {
+    private static double weightedPieces(World world, double x, double y, double z) {
+        BoundingBox area = new BoundingBox(x - RANGE, y - RANGE, z - RANGE, x + RANGE, y + RANGE, z + RANGE);
         int highest = 0;
         int sum = 0;
-        for (Player player : nearby) {
-            if (player.getGameMode() == GameMode.SPECTATOR) {
+        for (Player player : world.getPlayers()) {
+            if (player.getGameMode() == GameMode.SPECTATOR || !player.getBoundingBox().overlaps(area)) {
                 continue;
             }
             int worn = wornNetherite(player);
@@ -77,11 +84,22 @@ final class NetheriteHostiles implements Listener {
     }
 
     private static int wornNetherite(Player player) {
+        EntityEquipment equipment = player.getEquipment();
+        if (equipment == null) {
+            return 0;
+        }
         int worn = 0;
-        for (ItemStack piece : player.getInventory().getArmorContents()) {
-            if (isNetherite(piece)) {
-                worn++;
-            }
+        if (isNetherite(equipment.getHelmet())) {
+            worn++;
+        }
+        if (isNetherite(equipment.getChestplate())) {
+            worn++;
+        }
+        if (isNetherite(equipment.getLeggings())) {
+            worn++;
+        }
+        if (isNetherite(equipment.getBoots())) {
+            worn++;
         }
         return worn;
     }

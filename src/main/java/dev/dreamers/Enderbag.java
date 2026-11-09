@@ -31,8 +31,8 @@ import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
+import io.papermc.paper.datacomponent.item.BundleContents;
 import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -138,7 +138,7 @@ final class Enderbag {
         if (stack == null || stack.getType().isAir() || !Tag.ITEMS_BUNDLES.isTagged(stack.getType()) || is(stack) || legacy(stack)) {
             return false;
         }
-        if (stack.getItemMeta() instanceof BundleMeta bundle && bundle.hasItems()) {
+        if (bundleHasItems(stack)) {
             return false;
         }
         if (sackItems == null) {
@@ -146,6 +146,11 @@ final class Enderbag {
         }
         byte[] stored = stack.getPersistentDataContainer().get(sackItems, PersistentDataType.BYTE_ARRAY);
         return stored == null || stored.length == 0;
+    }
+
+    private static boolean bundleHasItems(ItemStack stack) {
+        BundleContents contents = stack.getData(DataComponentTypes.BUNDLE_CONTENTS);
+        return contents != null && !contents.contents().isEmpty();
     }
 
     private static boolean isEnderbagRecipe(Recipe crafted) {
@@ -232,11 +237,15 @@ final class Enderbag {
 
         @EventHandler
         public void onOpen(InventoryOpenEvent event) {
-            replaceInventory(event.getInventory());
-            if (event.getPlayer() instanceof Player player) {
-                replaceInventory(player.getInventory());
-                replaceCursor(player);
+            Inventory opened = event.getInventory();
+            replaceInventory(opened);
+            if (!(event.getPlayer() instanceof Player player)) {
+                return;
             }
+            if (opened != player.getInventory()) {
+                replaceInventory(player.getInventory());
+            }
+            replaceCursor(player);
         }
 
         @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

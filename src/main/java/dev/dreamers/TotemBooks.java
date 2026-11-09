@@ -1,12 +1,12 @@
 package dev.dreamers;
 
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ItemEnchantments;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import io.papermc.paper.registry.RegistryAccess;
-import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
@@ -23,7 +23,6 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 final class TotemBooks implements Listener {
@@ -59,18 +58,25 @@ final class TotemBooks implements Listener {
 
     @EventHandler
     public void onOpen(InventoryOpenEvent event) {
-        replaceInventory(event.getInventory());
-        if (event.getPlayer() instanceof Player player) {
-            replaceInventory(player.getInventory());
-            replaceCursor(player);
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
-                if (!player.isOnline()) {
-                    return;
-                }
-                replaceInventory(event.getInventory());
-                replaceInventory(player.getInventory());
-            });
+        Inventory opened = event.getInventory();
+        replaceInventory(opened);
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
         }
+        Inventory carried = player.getInventory();
+        if (opened != carried) {
+            replaceInventory(carried);
+        }
+        replaceCursor(player);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            replaceInventory(opened);
+            if (opened != carried) {
+                replaceInventory(carried);
+            }
+        });
     }
 
     @EventHandler
@@ -249,29 +255,51 @@ final class TotemBooks implements Listener {
         if (stack == null || stack.getType() != Material.ENCHANTED_BOOK) {
             return null;
         }
-        if (!(stack.getItemMeta() instanceof EnchantmentStorageMeta meta)) {
+        ItemEnchantments stored = stack.getData(DataComponentTypes.STORED_ENCHANTMENTS);
+        if (stored == null) {
             return null;
         }
-        if (has(meta, NUTRI)) {
-            return DreamerTotem.nutri();
+        int best = Integer.MAX_VALUE;
+        for (Map.Entry<Enchantment, Integer> entry : stored.enchantments().entrySet()) {
+            Integer level = entry.getValue();
+            if (level == null || level <= 0) {
+                continue;
+            }
+            int rank = rank(entry.getKey().getKey());
+            if (rank < best) {
+                best = rank;
+            }
         }
-        if (has(meta, FERREO)) {
-            return DreamerTotem.ferreo();
-        }
-        if (has(meta, YUNQUE)) {
-            return DreamerTotem.yunque();
-        }
-        if (has(meta, UNDEAD)) {
-            return DreamerTotem.undead();
-        }
-        if (has(meta, DREAMER)) {
-            return DreamerTotem.dreamer();
-        }
-        return null;
+        return totem(best);
     }
 
-    private static boolean has(EnchantmentStorageMeta meta, NamespacedKey key) {
-        Enchantment enchantment = RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT).get(key);
-        return enchantment != null && meta.hasStoredEnchant(enchantment);
+    private static int rank(NamespacedKey key) {
+        if (NUTRI.equals(key)) {
+            return 0;
+        }
+        if (FERREO.equals(key)) {
+            return 1;
+        }
+        if (YUNQUE.equals(key)) {
+            return 2;
+        }
+        if (UNDEAD.equals(key)) {
+            return 3;
+        }
+        if (DREAMER.equals(key)) {
+            return 4;
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    private static ItemStack totem(int rank) {
+        return switch (rank) {
+            case 0 -> DreamerTotem.nutri();
+            case 1 -> DreamerTotem.ferreo();
+            case 2 -> DreamerTotem.yunque();
+            case 3 -> DreamerTotem.undead();
+            case 4 -> DreamerTotem.dreamer();
+            default -> null;
+        };
     }
 }

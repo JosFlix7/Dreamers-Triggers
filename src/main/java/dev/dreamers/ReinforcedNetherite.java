@@ -60,16 +60,17 @@ final class ReinforcedNetherite {
         return isPiece(stack) && !reinforced(stack);
     }
 
-    private static boolean isPiece(ItemStack stack) {
-        if (stack == null || stack.getType().isAir()) {
-            return false;
-        }
-        return switch (stack.getType()) {
+    static boolean isGear(Material type) {
+        return switch (type) {
             case NETHERITE_HELMET, NETHERITE_CHESTPLATE, NETHERITE_LEGGINGS, NETHERITE_BOOTS,
                     NETHERITE_AXE, NETHERITE_HOE, NETHERITE_PICKAXE, NETHERITE_SHOVEL,
                     NETHERITE_SWORD, NETHERITE_SPEAR -> true;
             default -> false;
         };
+    }
+
+    private static boolean isPiece(ItemStack stack) {
+        return stack != null && !stack.getType().isAir() && isGear(stack.getType());
     }
 
     private static boolean armor(Material type) {
@@ -122,7 +123,7 @@ final class ReinforcedNetherite {
     }
 
     static boolean tint(ItemStack stack) {
-        if (stack == null || stack.getType().isAir() || !reinforced(stack)) {
+        if (!isPiece(stack) || !reinforced(stack)) {
             return false;
         }
         boolean changed = false;
