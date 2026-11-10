@@ -56,7 +56,7 @@ final class XaeroMaps implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         load();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            send(player);
+            sendRules(player);
         }
     }
 
@@ -69,7 +69,7 @@ final class XaeroMaps implements Listener {
     void reload() {
         load();
         for (Player player : plugin.getServer().getOnlinePlayers()) {
-            send(player);
+            sendRules(player);
         }
     }
 
@@ -102,7 +102,7 @@ final class XaeroMaps implements Listener {
         plugin.saveConfig();
         boolean online = target.isOnline() && target.getPlayer() != null;
         if (online) {
-            send(target.getPlayer());
+            sendRules(target.getPlayer());
         }
         String saved = online ? "Quedó guardado y se aplicó." : "Quedó guardado y se aplicará cuando entre.";
         sender.sendMessage(Component.text("Xaero de " + name + ": " + rule.text() + " " + saved, NamedTextColor.GREEN));
@@ -233,9 +233,18 @@ final class XaeroMaps implements Listener {
     }
 
     private void send(Player player, String channel) {
+        sendRules(player, channel);
+        player.sendPluginMessage(plugin, channel, levelPacket(levelId));
+    }
+
+    private void sendRules(Player player) {
+        sendRules(player, WORLD_MAP);
+        sendRules(player, MINI_MAP);
+    }
+
+    private void sendRules(Player player, String channel) {
         Rule rule = players.getOrDefault(player.getUniqueId(), defaults);
         player.sendPluginMessage(plugin, channel, rulesPacket(rule));
-        player.sendPluginMessage(plugin, channel, levelPacket(levelId));
     }
 
     private OfflinePlayer find(String name) {
