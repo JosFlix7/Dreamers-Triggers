@@ -5,6 +5,7 @@ death-uhc:
 
 # Comandos que puede usar quien no es op y no tiene dreamers.commands.bypass.
 # El tabulador solo ofrece estos. El nombre va sin la barra.
+# Un subcomando se escribe aparte: dreamers armor solo deja ese.
 # minecraft:tell cuenta como tell. blocked acepta códigos de color &.
 commands:
   allowed:
@@ -22,7 +23,14 @@ commands:
     - abandonallclaims
     - givepet
     - trustlist
+    - dreamers armor
   blocked: "&cEste comando está bloqueado."
+
+# Visibilidad de la armadura. true se ve y false se oculta.
+# /dreamers armor <true|false> cambia la propia. Un operador puede indicar el jugador.
+# Con la armadura oculta, al recibir daño se ve durante 5 segundos.
+armor:
+  players: {}
 
 # Xaero's Minimap. Los allow-* valen para quien no tiene regla propia.
 # level-id identifica el servidor ante el mod; no lo cambies.

@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerCommandSendEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -33,11 +34,13 @@ final class CommandFilter implements Listener {
             "unlockdrops",
             "abandonallclaims",
             "givepet",
-            "trustlist"
+            "trustlist",
+            "dreamers armor"
     );
     private static final List<String> COMMENTS = List.of(
             "Comandos que puede usar quien no es op y no tiene dreamers.commands.bypass.",
             "El tabulador solo ofrece estos. El nombre va sin la barra.",
+            "Un subcomando se escribe aparte: dreamers armor solo deja ese.",
             "minecraft:tell cuenta como tell. blocked acepta códigos de color &."
     );
 
@@ -54,7 +57,12 @@ final class CommandFilter implements Listener {
         boolean changed = false;
         if (!config.isList("commands.allowed")) {
             config.set("commands.allowed", DEFAULT_ALLOWED);
-            config.setComments("commands", COMMENTS);
+            changed = true;
+        }
+        List<String> entries = new ArrayList<>(config.getStringList("commands.allowed"));
+        if (entries.stream().noneMatch(entry -> "dreamers armor".equals(allowedEntry(entry)))) {
+            entries.add("dreamers armor");
+            config.set("commands.allowed", entries);
             changed = true;
         }
         if (!config.isString("commands.blocked")) {
@@ -62,11 +70,12 @@ final class CommandFilter implements Listener {
             changed = true;
         }
         if (changed) {
+            config.setComments("commands", COMMENTS);
             plugin.saveConfig();
         }
         Set<String> next = new HashSet<>();
-        for (String entry : config.getStringList("commands.allowed")) {
-            String command = label(entry);
+        for (String entry : entries) {
+            String command = allowedEntry(entry);
             if (!command.isEmpty()) {
                 next.add(command);
             }
@@ -74,14 +83,14 @@ final class CommandFilter implements Listener {
         allowed = Set.copyOf(next);
         String message = config.getString("commands.blocked", BLOCKED);
         blocked = message == null || message.isBlank() ? BLOCKED : message;
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            player.updateCommands();
+        }
     }
 
     void reload() {
         plugin.reloadConfig();
         load();
-        for (Player player : plugin.getServer().getOnlinePlayers()) {
-            player.updateCommands();
-        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -99,37 +108,89 @@ final class CommandFilter implements Listener {
         if (bypasses(event.getPlayer())) {
             return;
         }
-        event.getCommands().removeIf(command -> !permitted(command));
+        event.getCommands().removeIf(command -> !offered(command));
     }
 
     private boolean permitted(String raw) {
-        String command = label(raw);
+        String[] parts = words(raw);
+        if (parts.length == 0) {
+            return false;
+        }
+        String command = base(parts[0]);
         if (command.isEmpty()) {
             return false;
         }
         if (allowed.contains(command)) {
             return true;
         }
-        int colon = command.lastIndexOf(':');
-        return colon >= 0 && colon < command.length() - 1 && allowed.contains(command.substring(colon + 1));
+        return parts.length >= 2 && allowed.contains(command + " " + base(parts[1]));
+    }
+
+    private boolean offered(String raw) {
+        String command = base(raw);
+        if (command.isEmpty()) {
+            return false;
+        }
+        if (allowed.contains(command)) {
+            return true;
+        }
+        String prefix = command + " ";
+        for (String entry : allowed) {
+            if (entry.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean bypasses(Player player) {
         return player.isOp() || player.hasPermission(BYPASS);
     }
 
-    private static String label(String raw) {
+    private static String allowedEntry(String raw) {
+        String[] parts = words(raw);
+        if (parts.length == 0) {
+            return "";
+        }
+        String command = base(parts[0]);
+        if (command.isEmpty() || parts.length == 1) {
+            return command;
+        }
+        String sub = base(parts[1]);
+        if (sub.isEmpty()) {
+            return command;
+        }
+        return command + " " + sub;
+    }
+
+    private static String[] words(String raw) {
         if (raw == null) {
+            return new String[0];
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return new String[0];
+        }
+        return trimmed.split("\\s+");
+    }
+
+    private static String base(String token) {
+        if (token == null) {
             return "";
         }
-        String token = raw.trim();
-        if (token.isEmpty()) {
+        String command = token.trim();
+        if (command.isEmpty()) {
             return "";
         }
-        int space = token.indexOf(' ');
+        int space = command.indexOf(' ');
         if (space >= 0) {
-            token = token.substring(0, space);
+            command = command.substring(0, space);
         }
-        return token.replace("/", "").toLowerCase(Locale.ROOT);
+        command = command.replace("/", "").toLowerCase(Locale.ROOT);
+        int colon = command.lastIndexOf(':');
+        if (colon >= 0 && colon < command.length() - 1) {
+            command = command.substring(colon + 1);
+        }
+        return command;
     }
 }

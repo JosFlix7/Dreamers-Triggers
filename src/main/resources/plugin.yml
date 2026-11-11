@@ -1,5 +1,5 @@
 name: DreamersTriggers
-version: '1.6.2'
+version: '1.6.3'
 author: JosFlix7
 main: dev.dreamers.DreamersPlugin
 api-version: '26.3'
@@ -8,9 +8,7 @@ description: Dreamers Triggers
 commands:
   dreamers:
     description: Configura Dreamers Triggers
-    usage: /dreamers DeathUCH <on|off|time> | /dreamers reload | /dreamers xm <jugador> <cuevas> <cuevasNether> <radar> | /dreamers give <jugador> <objeto> <cantidad>
-    permission: dreamers.deathuhc
-    permission-message: No puedes usar este comando.
+    usage: /dreamers armor <true|false>
 permissions:
   dreamers.deathuhc:
     description: Activa el modo UHC cuando muere un jugador y recarga la configuración
