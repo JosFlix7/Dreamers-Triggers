@@ -2,3 +2,6 @@
 .gradle/
 build/
 libs/
+.fabric_mod-sender/.gradle/
+.fabric_mod-sender/build/
+.fabric_mod-sender/run/

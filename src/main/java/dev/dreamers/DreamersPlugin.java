@@ -12,6 +12,7 @@ public final class DreamersPlugin extends JavaPlugin {
     private AppleSkinSync appleSkin;
     private XaeroMaps xaero;
     private ArmorVisibility armor;
+    private FabricModWhitelist mods;
     private boolean discord;
 
     @Override
@@ -48,9 +49,11 @@ public final class DreamersPlugin extends JavaPlugin {
         xaero.enable();
         armor = new ArmorVisibility(this);
         armor.enable();
+        mods = new FabricModWhitelist(this);
+        mods.enable();
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
-            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles), armor);
+            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles), armor, mods);
             dreamers.setExecutor(command);
             dreamers.setTabCompleter(command);
         }
@@ -83,6 +86,9 @@ public final class DreamersPlugin extends JavaPlugin {
         }
         if (armor != null) {
             armor.disable();
+        }
+        if (mods != null) {
+            mods.disable();
         }
     }
 }

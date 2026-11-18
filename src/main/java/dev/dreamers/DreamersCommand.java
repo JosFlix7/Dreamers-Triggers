@@ -26,13 +26,15 @@ final class DreamersCommand implements CommandExecutor, TabCompleter {
     private final XaeroMaps xaero;
     private final CustomItems items;
     private final ArmorVisibility armor;
+    private final FabricModWhitelist mods;
 
-    DreamersCommand(DeathUhc uhc, CommandFilter commands, XaeroMaps xaero, CustomItems items, ArmorVisibility armor) {
+    DreamersCommand(DeathUhc uhc, CommandFilter commands, XaeroMaps xaero, CustomItems items, ArmorVisibility armor, FabricModWhitelist mods) {
         this.uhc = uhc;
         this.commands = commands;
         this.xaero = xaero;
         this.items = items;
         this.armor = armor;
+        this.mods = mods;
     }
 
     @Override
@@ -62,6 +64,7 @@ final class DreamersCommand implements CommandExecutor, TabCompleter {
             uhc.reload();
             xaero.reload();
             armor.reload();
+            mods.reload();
             sender.sendMessage(Component.text("La configuración se ha recargado correctamente.", NamedTextColor.GREEN));
             return true;
         }

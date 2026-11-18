@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "dreamers-mod-sender",
+  "version": "1.0.0",
+  "name": "Dreamers Mod Sender",
+  "description": "Manda al servidor la lista de mods de Fabric.",
+  "authors": ["JosFlix7"],
+  "license": "All Rights Reserved",
+  "environment": "client",
+  "mixins": ["dreamers-mod-sender.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "26.3"
+  }
+}

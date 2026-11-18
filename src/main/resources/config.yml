@@ -39,3 +39,49 @@ xaero:
   allow-cave-mode: true
   allow-nether-cave-mode: true
   allow-radar: true
+
+# Fabric Mod Whitelist. Con enabled en true solo entran vanilla, un operador,
+# o Fabric si cada mod que manda está en Mods admitidos.
+# La versión no importa y no hace falta traerlos todos.
+# Un Fabric que no manda la lista sale. Otro cargador también.
+# minecraft, java, fabricloader y mixinextras se admiten siempre.
+# Los mods empaquetados dentro de otro jar no se revisan.
+# dreamers-mod-sender tiene que quedarse: es el mod que manda la lista.
+fabric-mod-whitelist:
+  enabled: true
+  # Mods admitidos
+  allowed:
+    - appleskin
+    - architectury
+    - badoptimizations
+    - betterf3
+    - c2me
+    - chat_heads
+    - cloth-config
+    - clumps
+    - continuity
+    - dreamers-mod-sender
+    - entityculling
+    - fabric-api
+    - ferritecore
+    - immediatelyfast
+    - inventoryhud
+    - iris
+    - librarian-trade-finder
+    - lithium
+    - logical_zoom
+    - lss
+    - modmenu
+    - moreculling
+    - reeses-sodium-options
+    - renderscale
+    - roughlyenoughitems
+    - scalablelux
+    - shulkerboxtooltip
+    - sodium
+    - sodium-extra
+    - vmp
+    - voicechat
+    - voxy
+    - xaerominimap
+    - xaeroworldmap
