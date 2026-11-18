@@ -40,15 +40,22 @@ xaero:
   allow-nether-cave-mode: true
   allow-radar: true
 
-# Fabric Mod Whitelist. Con enabled en true solo entran vanilla, un operador,
-# o Fabric si cada mod que manda está en Mods admitidos.
+# Fabric Mod Whitelist. Con enabled en true solo entra un operador o un cliente de Clients.
+# Check mods revisa la lista de esos clientes: sale quien no la manda o trae un mod que no está admitido.
 # La versión no importa y no hace falta traerlos todos.
-# Un Fabric que no manda la lista sale. Otro cargador también.
 # minecraft, java, fabricloader y mixinextras se admiten siempre.
 # Los mods empaquetados dentro de otro jar no se revisan.
 # dreamers-mod-sender tiene que quedarse: es el mod que manda la lista.
 fabric-mod-whitelist:
   enabled: true
+  # Clients
+  clients:
+    - vanilla
+    - fabric
+    - horizon
+  # Check mods
+  check-mods:
+    - fabric
   # Mods admitidos
   allowed:
     - appleskin

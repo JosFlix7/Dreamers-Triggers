@@ -28,20 +28,22 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Fabric Mod Whitelist. Vanilla entra. Un operador entra con cualquier cliente.
- * Fabric entra si mandó su lista y cada mod está en Mods admitidos.
+ * Fabric Mod Whitelist. Entran los clientes de Clients. Un operador entra con cualquiera.
+ * A los de Check mods se les revisa la lista: cada mod tiene que estar en Mods admitidos.
  */
 final class FabricModWhitelist implements Listener, PluginMessageListener {
     static final String CHANNEL = "dreamers:mods";
     private static final String ROOT = "fabric-mod-whitelist";
     private static final Pattern MOD_ID = Pattern.compile("^[a-z][a-z0-9_\\-]{0,63}$");
+    private static final Pattern CLIENT = Pattern.compile("^[a-z0-9][a-z0-9_\\-.]{0,63}$");
     private static final long WAIT_MS = 3000L;
+    private static final List<String> DEFAULT_CLIENTS = List.of("vanilla", "fabric", "horizon");
+    private static final List<String> DEFAULT_CHECK = List.of("fabric");
     private static final Set<String> ALWAYS = Set.of("minecraft", "java", "fabricloader", "mixinextras");
     private static final List<String> COMMENTS = List.of(
-            "Fabric Mod Whitelist. Con enabled en true solo entran vanilla, un operador,",
-            "o Fabric si cada mod que manda está en Mods admitidos.",
+            "Fabric Mod Whitelist. Con enabled en true solo entra un operador o un cliente de Clients.",
+            "Check mods revisa la lista de esos clientes: sale quien no la manda o trae un mod que no está admitido.",
             "La versión no importa y no hace falta traerlos todos.",
-            "Un Fabric que no manda la lista sale. Otro cargador también.",
             "minecraft, java, fabricloader y mixinextras se admiten siempre.",
             "Los mods empaquetados dentro de otro jar no se revisan.",
             "dreamers-mod-sender tiene que quedarse: es el mod que manda la lista."
@@ -50,6 +52,9 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
     private final JavaPlugin plugin;
     private final ConcurrentHashMap<UUID, Report> reports = new ConcurrentHashMap<>();
     private volatile boolean enabled;
+    private volatile List<String> clients = List.of();
+    private volatile Set<String> clientSet = Set.of();
+    private volatile Set<String> checkMods = Set.of();
     private volatile Set<String> allowed = Set.of();
 
     FabricModWhitelist(JavaPlugin plugin) {
@@ -79,6 +84,16 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
             config.set(ROOT + ".enabled", true);
             changed = true;
         }
+        if (!config.isList(ROOT + ".clients")) {
+            config.set(ROOT + ".clients", DEFAULT_CLIENTS);
+            config.setComments(ROOT + ".clients", List.of("Clients"));
+            changed = true;
+        }
+        if (!config.isList(ROOT + ".check-mods")) {
+            config.set(ROOT + ".check-mods", DEFAULT_CHECK);
+            config.setComments(ROOT + ".check-mods", List.of("Check mods"));
+            changed = true;
+        }
         if (!config.isList(ROOT + ".allowed")) {
             config.set(ROOT + ".allowed", defaultAllowed());
             config.setComments(ROOT + ".allowed", List.of("Mods admitidos"));
@@ -89,6 +104,10 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
             plugin.saveConfig();
         }
         enabled = config.getBoolean(ROOT + ".enabled", true);
+        List<String> clientNames = names(config.getStringList(ROOT + ".clients"));
+        clients = clientNames;
+        clientSet = Set.copyOf(clientNames);
+        checkMods = Set.copyOf(names(config.getStringList(ROOT + ".check-mods")));
         Set<String> next = new HashSet<>(ALWAYS);
         for (String entry : config.getStringList(ROOT + ".allowed")) {
             if (entry == null) {
@@ -148,23 +167,26 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
         if (id != null && plugin.getServer().getOfflinePlayer(id).isOp()) {
             return;
         }
+        List<String> admitted = clients;
+        Set<String> admittedSet = clientSet;
+        Set<String> checked = checkMods;
         long deadline = System.nanoTime() + WAIT_MS * 1_000_000L;
         while (true) {
             if (!connection.isConnected()) {
                 return;
             }
-            String brand = connection.getClientBrandName();
+            List<String> brand = tokens(connection.getClientBrandName());
             Report report = id == null ? null : reports.get(id);
-            if (vanilla(brand)) {
+            if (!brand.isEmpty() && !admitted(brand, admittedSet)) {
+                deny(connection, id, admittedClients(admitted));
                 return;
             }
-            if (brand != null && !fabric(brand)) {
-                deny(connection, id, "Solo se puede entrar con vanilla o con Fabric.");
+            if (!brand.isEmpty() && !checks(brand, checked)) {
                 return;
             }
-            if (fabric(brand) && report != null) {
-                if (!report.valid()) {
-                    deny(connection, id, "El cliente de Fabric no envió una lista de mods válida.");
+            if (!brand.isEmpty() && report != null) {
+                if (!valid(brand, report)) {
+                    deny(connection, id, "El cliente no envió una lista de mods válida.");
                     return;
                 }
                 List<String> extra = extra(report.mods());
@@ -184,11 +206,11 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
                 break;
             }
         }
-        if (connection.getClientBrandName() == null) {
+        if (tokens(connection.getClientBrandName()).isEmpty()) {
             deny(connection, id, "No se pudo identificar el cliente.");
             return;
         }
-        deny(connection, id, "El cliente de Fabric no envió la lista de mods.");
+        deny(connection, id, "El cliente no envió la lista de mods.");
     }
 
     @EventHandler
@@ -244,21 +266,55 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
             }
             mods.add(id);
         }
-        if (!mods.contains("fabricloader")) {
-            return Report.invalid();
-        }
         return new Report(Set.copyOf(mods), true);
     }
 
-    private static boolean vanilla(String brand) {
-        List<String> tokens = tokens(brand);
-        return !tokens.isEmpty() && tokens.stream().allMatch("vanilla"::equals);
+    private static List<String> names(List<String> entries) {
+        List<String> names = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String entry : entries) {
+            if (entry == null) {
+                continue;
+            }
+            String name = entry.trim().toLowerCase(Locale.ROOT);
+            if (CLIENT.matcher(name).matches() && seen.add(name)) {
+                names.add(name);
+            }
+        }
+        return List.copyOf(names);
     }
 
-    private static boolean fabric(String brand) {
-        List<String> tokens = tokens(brand);
-        return tokens.contains("fabric")
-                && tokens.stream().allMatch(token -> token.equals("fabric") || token.equals("vanilla"));
+    private static boolean admitted(List<String> brand, Set<String> clients) {
+        for (String token : brand) {
+            if (!clients.contains(token)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean checks(List<String> brand, Set<String> checkMods) {
+        for (String token : brand) {
+            if (checkMods.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean valid(List<String> brand, Report report) {
+        return report.valid() && (!brand.contains("fabric") || report.mods().contains("fabricloader"));
+    }
+
+    private static String admittedClients(List<String> clients) {
+        if (clients.isEmpty()) {
+            return "Este cliente no está admitido.";
+        }
+        if (clients.size() == 1) {
+            return "Solo se puede entrar con " + clients.get(0) + ".";
+        }
+        String head = String.join(", ", clients.subList(0, clients.size() - 1));
+        return "Solo se puede entrar con " + head + " o " + clients.get(clients.size() - 1) + ".";
     }
 
     private static List<String> tokens(String brand) {
