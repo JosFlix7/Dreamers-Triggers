@@ -1,7 +1,17 @@
 package dev.dreamers;
 
 import org.bukkit.command.PluginCommand;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class DreamersPlugin extends JavaPlugin {
     private DeathUhc deathUhc;
@@ -17,8 +27,7 @@ public final class DreamersPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
-        reloadConfig();
+        installConfig();
         DreamerTotem.enable(this);
         discord = getServer().getPluginManager().getPlugin("DiscordSRV") != null;
         if (discord) {
@@ -56,6 +65,61 @@ public final class DreamersPlugin extends JavaPlugin {
             DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles), armor, mods);
             dreamers.setExecutor(command);
             dreamers.setTabCompleter(command);
+        }
+    }
+
+    @Override
+    public void saveConfig() {
+        mergeBaseConfig();
+        super.saveConfig();
+    }
+
+    private void installConfig() {
+        File file = new File(getDataFolder(), "config.yml");
+        if (!file.exists()) {
+            saveResource("config.yml", false);
+        }
+        reloadConfig();
+    }
+
+    private void mergeBaseConfig() {
+        try (InputStream in = getResource("config.yml")) {
+            if (in == null) {
+                return;
+            }
+            YamlConfiguration base = YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
+            copyMissing(base, getConfig());
+        } catch (IOException exception) {
+            getLogger().warning("No se pudo completar el config con las opciones base.");
+        }
+    }
+
+    private static void copyMissing(ConfigurationSection from, ConfigurationSection to) {
+        for (String key : from.getKeys(false)) {
+            if (!to.contains(key, true)) {
+                if (from.isConfigurationSection(key)) {
+                    ConfigurationSection created = to.createSection(key);
+                    copyComments(from, to, key);
+                    copyMissing(from.getConfigurationSection(key), created);
+                } else {
+                    Object value = from.get(key);
+                    to.set(key, value instanceof List<?> list ? new ArrayList<>(list) : value);
+                    copyComments(from, to, key);
+                }
+            } else if (from.isConfigurationSection(key) && to.isConfigurationSection(key)) {
+                copyMissing(from.getConfigurationSection(key), to.getConfigurationSection(key));
+            }
+        }
+    }
+
+    private static void copyComments(ConfigurationSection from, ConfigurationSection to, String key) {
+        List<String> comments = from.getComments(key);
+        if (comments != null && !comments.isEmpty()) {
+            to.setComments(key, comments);
+        }
+        List<String> inline = from.getInlineComments(key);
+        if (inline != null && !inline.isEmpty()) {
+            to.setInlineComments(key, inline);
         }
     }
 
