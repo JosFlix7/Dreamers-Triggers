@@ -42,6 +42,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cabecera, lista vanilla, nametags, texto bajo el nombre, marcador y chat.
@@ -79,7 +80,7 @@ final class TabBoard implements Listener {
     private final JavaPlugin plugin;
     private final Placeholders placeholders;
     private final Map<UUID, Scoreboard> boards = new HashMap<>();
-    private final Map<UUID, TagText> chatTags = new HashMap<>();
+    private final Map<UUID, TagText> chatTags = new ConcurrentHashMap<>();
     private final Map<UUID, String> tagSignature = new HashMap<>();
     private final Map<UUID, String> tabCache = new HashMap<>();
     private final Map<UUID, String> headerCache = new HashMap<>();
@@ -480,7 +481,7 @@ final class TabBoard implements Listener {
         if (tag == null) {
             return;
         }
-        chatTags.put(player.getUniqueId(), new TagText(tag.tagPrefix(), tag.tagSuffix()));
+        chatTags.put(player.getUniqueId(), new TagText(tag.tagPrefix(), tag.tagSuffix(), player.getName()));
         // El nombre de la lista va completo. El equipo solo alimenta el nametag,
         // porque con el nombre puesto el cliente no le suma el prefijo del equipo.
         User user = users.get(player.getName().toLowerCase(Locale.ROOT));
@@ -851,7 +852,8 @@ final class TabBoard implements Listener {
             TagText tag = chatTags.get(source.getUniqueId());
             String prefix = tag == null ? "" : tag.prefix();
             String suffix = tag == null ? "" : tag.suffix();
-            return Placeholders.LEGACY.deserialize("<" + prefix + source.getName() + suffix + "&r> ").append(message);
+            String name = tag == null ? source.getName() : tag.name();
+            return Placeholders.LEGACY.deserialize("<" + prefix + name + suffix + "&r> ").append(message);
         }));
     }
 
@@ -866,7 +868,7 @@ final class TabBoard implements Listener {
     private record Tag(String tagPrefix, String tagSuffix) {
     }
 
-    private record TagText(String prefix, String suffix) {
+    private record TagText(String prefix, String suffix, String name) {
     }
 
     private record Design(List<String> header, List<String> footer) {

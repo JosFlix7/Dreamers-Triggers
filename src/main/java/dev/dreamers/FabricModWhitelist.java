@@ -173,6 +173,9 @@ final class FabricModWhitelist implements Listener, PluginMessageListener {
         long deadline = System.nanoTime() + WAIT_MS * 1_000_000L;
         while (true) {
             if (!connection.isConnected()) {
+                if (id != null) {
+                    reports.remove(id);
+                }
                 return;
             }
             List<String> brand = tokens(connection.getClientBrandName());
