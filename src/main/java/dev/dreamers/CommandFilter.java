@@ -12,8 +12,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 final class CommandFilter implements Listener {
@@ -24,18 +26,44 @@ final class CommandFilter implements Listener {
             "tell",
             "msg",
             "me",
-            "abandonclaim",
-            "unclaim",
-            "trust",
-            "untrust",
-            "containertrust",
-            "accesstrust",
-            "permissiontrust",
-            "unlockdrops",
-            "abandonallclaims",
-            "givepet",
-            "trustlist",
-            "dreamers armor"
+            "dreamers unclaim",
+            "dreamers trust",
+            "dreamers untrust",
+            "dreamers containertrust",
+            "dreamers accesstrust",
+            "dreamers permissiontrust",
+            "dreamers unlockdrops",
+            "dreamers abandonallclaims",
+            "dreamers givepet",
+            "dreamers trustlist",
+            "dreamers armor",
+            "dreamers scoreboard_info"
+    );
+    private static final List<String> REQUIRED = List.of(
+            "dreamers unclaim",
+            "dreamers trust",
+            "dreamers untrust",
+            "dreamers containertrust",
+            "dreamers accesstrust",
+            "dreamers permissiontrust",
+            "dreamers unlockdrops",
+            "dreamers abandonallclaims",
+            "dreamers givepet",
+            "dreamers trustlist",
+            "dreamers armor",
+            "dreamers scoreboard_info"
+    );
+    private static final Map<String, String> REPLACED = Map.ofEntries(
+            Map.entry("unclaim", "dreamers unclaim"),
+            Map.entry("trust", "dreamers trust"),
+            Map.entry("untrust", "dreamers untrust"),
+            Map.entry("containertrust", "dreamers containertrust"),
+            Map.entry("accesstrust", "dreamers accesstrust"),
+            Map.entry("permissiontrust", "dreamers permissiontrust"),
+            Map.entry("unlockdrops", "dreamers unlockdrops"),
+            Map.entry("abandonallclaims", "dreamers abandonallclaims"),
+            Map.entry("givepet", "dreamers givepet"),
+            Map.entry("trustlist", "dreamers trustlist")
     );
     private static final List<String> COMMENTS = List.of(
             "Comandos que puede usar quien no es op y no tiene dreamers.commands.bypass.",
@@ -60,11 +88,34 @@ final class CommandFilter implements Listener {
             changed = true;
         }
         List<String> entries = new ArrayList<>(config.getStringList("commands.allowed"));
-        if (entries.stream().noneMatch(entry -> "dreamers armor".equals(allowedEntry(entry)))) {
-            entries.add("dreamers armor");
-            config.set("commands.allowed", entries);
-            changed = true;
+        LinkedHashSet<String> kept = new LinkedHashSet<>();
+        for (String entry : entries) {
+            String key = allowedEntry(entry);
+            if (key.isEmpty() || "abandonclaim".equals(key)) {
+                changed = true;
+                continue;
+            }
+            String replacement = REPLACED.get(key);
+            if (replacement != null) {
+                if (!replacement.equals(key)) {
+                    changed = true;
+                }
+                kept.add(replacement);
+            } else {
+                String trimmed = entry.trim();
+                if (!trimmed.equals(entry)) {
+                    changed = true;
+                }
+                kept.add(trimmed);
+            }
         }
+        for (String required : REQUIRED) {
+            if (kept.add(required)) {
+                changed = true;
+            }
+        }
+        entries = new ArrayList<>(kept);
+        config.set("commands.allowed", entries);
         if (!config.isString("commands.blocked")) {
             config.set("commands.blocked", BLOCKED);
             changed = true;

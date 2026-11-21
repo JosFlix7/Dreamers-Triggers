@@ -23,6 +23,12 @@ public final class DreamersPlugin extends JavaPlugin {
     private XaeroMaps xaero;
     private ArmorVisibility armor;
     private FabricModWhitelist mods;
+    private PersonalLoot loot;
+    private ViewDistance viewDistance;
+    private Claims claims;
+    private ClaimWorld claimWorld;
+    private TabBoard tab;
+    private InventorySee inventories;
     private boolean discord;
 
     @Override
@@ -60,9 +66,24 @@ public final class DreamersPlugin extends JavaPlugin {
         armor.enable();
         mods = new FabricModWhitelist(this);
         mods.enable();
+        loot = new PersonalLoot(this);
+        loot.enable();
+        viewDistance = new ViewDistance(this);
+        viewDistance.enable();
+        claims = new Claims(this);
+        claims.enable();
+        claimWorld = new ClaimWorld(this, claims);
+        claimWorld.enable();
+        ClaimDrops claimDrops = new ClaimDrops(this, claims);
+        claimDrops.enable();
+        tab = new TabBoard(this, claims);
+        getServer().getPluginManager().registerEvents(tab, this);
+        tab.enable();
+        inventories = new InventorySee(this);
+        inventories.enable();
         PluginCommand dreamers = getCommand("dreamers");
         if (dreamers != null) {
-            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles), armor, mods);
+            DreamersCommand command = new DreamersCommand(deathUhc, commands, xaero, new CustomItems(bundles), armor, mods, loot, viewDistance, claims, claimWorld, claimDrops, inventories, tab);
             dreamers.setExecutor(command);
             dreamers.setTabCompleter(command);
         }
@@ -153,6 +174,24 @@ public final class DreamersPlugin extends JavaPlugin {
         }
         if (mods != null) {
             mods.disable();
+        }
+        if (loot != null) {
+            loot.shutdown();
+        }
+        if (viewDistance != null) {
+            viewDistance.disable();
+        }
+        if (tab != null) {
+            tab.disable();
+        }
+        if (claimWorld != null) {
+            claimWorld.disable();
+        }
+        if (claims != null) {
+            claims.disable();
+        }
+        if (inventories != null) {
+            inventories.shutdown();
         }
     }
 }

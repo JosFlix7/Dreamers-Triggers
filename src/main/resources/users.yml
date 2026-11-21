@@ -1,0 +1,10 @@
+# Prefijos del tab y del nametag. /dreamers reload vuelve a leer este archivo.
+# El nombre del jugador no distingue mayúsculas.
+# tabprefix y tabsuffix solo salen en la lista de jugadores.
+# tagprefix y tagsuffix salen en el nametag y en el chat. tagsuffix es opcional.
+#
+# Jugador:
+#   tabprefix: '&d[ADM] &e'
+#   tagprefix: '&d[ADM] &e'
+#   tabsuffix: '&r &c☠&f%objective_score_{deaths}_{Jugador}%'
+#   tagsuffix: ''

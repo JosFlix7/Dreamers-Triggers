@@ -7,7 +7,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
@@ -95,7 +94,7 @@ final class CustomItems {
             return List.of();
         }
         if (args.length == 2) {
-            return starting(online(sender), args[1]);
+            return KnownPlayers.names(sender.getServer(), args[1]);
         }
         if (args.length == 3) {
             return starting(specs.stream().map(spec -> spec.id).toList(), args[2]);
@@ -139,14 +138,6 @@ final class CustomItems {
             }
         }
         return null;
-    }
-
-    private static List<String> online(CommandSender sender) {
-        List<String> names = new ArrayList<>();
-        for (Player online : sender.getServer().getOnlinePlayers()) {
-            names.add(online.getName());
-        }
-        return names;
     }
 
     private static List<String> starting(List<String> options, String typed) {

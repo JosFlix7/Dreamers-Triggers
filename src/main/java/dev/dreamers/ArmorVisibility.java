@@ -159,11 +159,7 @@ final class ArmorVisibility implements Listener {
             return starting(args[1], BOOLEANS);
         }
         if (args.length == 3 && operator(sender)) {
-            String prefix = args[2].toLowerCase(Locale.ROOT);
-            return sender.getServer().getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix))
-                    .toList();
+            return KnownPlayers.names(sender.getServer(), args[2]);
         }
         return List.of();
     }

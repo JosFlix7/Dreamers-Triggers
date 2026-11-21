@@ -51,6 +51,12 @@ Quien no es op y no tiene el permiso `dreamers.commands.bypass` solo puede usar 
 
 `minecraft:tell` cuenta como `tell`. La lista que trae el plugin es la que ya usaba el servidor: `tell`, `msg`, `me` y los de reclamaciones. Al actualizar, si `config.yml` todavía no tiene esa sección, el plugin la añade sin tocar el modo UHC.
 
+## Inventario
+
+`/dreamers inventory <jugador>` y `/dreamers enderchest <jugador>` los abre un operador. Un jugador que no es op no puede usarlos. Sirven con el jugador conectado o desconectado, y lo que se mueve entra o sale de su inventario al momento.
+
+En el inventario, la primera fila es la barra. Las tres siguientes son el resto. Debajo están las botas, los pantalones, la pechera, el casco, la mano secundaria, el cursor, el cuerpo y la montura. La última fila muestra la cuadrícula de crafteo de 2×2 y el resultado, o los huecos de la mesa que ese jugador tenga abierta. Tomar el resultado del crafteo 2×2 entrega el objeto y gasta los materiales. El cursor y el crafteo no quedan guardados cuando el jugador está desconectado.
+
 ## Experiencia embotellada
 
 Con una botella de cristal en la mano principal, el clic derecho en una mesa de encantamientos guarda experiencia: quita 7 puntos, gasta la botella de cristal y entrega una botella de experiencia. Esos 7 puntos son la media que suelta una botella al lanzarla (entre 3 y 11). Si no cabe en el inventario, cae al suelo. La mesa no se abre mientras se sostiene la botella. Si no alcanza la experiencia, el chat avisa en rojo. Cualquier jugador puede hacerlo.
@@ -61,7 +67,15 @@ Al talar un tronco, o cuando una hoja empieza a pudrirse, las hojas de alrededor
 
 ## Xaero's Minimap
 
-El mod recibe si puede usar las cuevas, las cuevas del Nether y el radar. Quien no tiene una regla propia usa los valores de `xaero` en `config.yml`, que de inicio están permitidos. `/dreamers xm <jugador> <cuevas> <cuevasNether> <radar>` guarda la regla de ese jugador con `true` o `false` y, si está conectado, se la aplica al momento. Sigue valiendo después de reiniciar. `/dreamers reload` vuelve a leer la configuración y la reenvía. El `level-id` que ya usa el servidor se conserva.
+El mod recibe si puede usar las cuevas, las cuevas del Nether y el radar de entidades. Quien no tiene una regla propia usa los valores de `xaero` en `config.yml`, que de inicio están permitidos. `/dreamers xm <jugador|@a> <cuevas> <cuevasNether> <radar> <trackPlayers>` guarda la regla con `true` o `false`. `@a` incluye a quien ya entró, esté conectado o no. Si está conectado, se le aplica al momento. `/dreamers xm <jugador|@a> reset` borra esa regla y vuelven los ajustes por defecto. Sigue valiendo después de reiniciar. `/dreamers reload` vuelve a leer la configuración y la reenvía. El `level-id` que ya usa el servidor se conserva.
+
+`trackPlayers` muestra en el mapa y el minimapa a los demás jugadores, estén donde estén. Si está en `false`, solo aparecen cuando entran en el alcance en el que el cliente ya los vería. No salen quienes están en espectador, invisibles o vanished. `radar` apaga el radar de mobs y del resto de entidades, y no esconde a los jugadores.
+
+## Botín único
+
+Cofres, cofres trampa, barriles y vagonetas con cofre que todavía tienen tabla de botín se abren con un inventario por jugador. Lo que cada quien deja dentro se guarda en ese contenedor. La mitad de un cofre doble sin tabla sigue siendo la de siempre, compartida. El botín no se suelta al romper el contenedor.
+
+Con `unique-loot.destroying.restricted` solo un jugador en creativo puede romperlos, y `confirmation` le pide confirmación. Mientras la restricción está activa, las explosiones, los pistones, las tolvas y los líquidos tampoco los destruyen. `auto-replenish` vuelve a generar el botín pasado un tiempo al azar entre `minutes-min` y `minutes-max`. `max-refills` cuenta cuántas veces se rellena; `-1` no tiene límite. `require-emptied` exige vaciarlo antes. `/dreamers reload` vuelve a leer estas opciones.
 
 ## AppleSkin
 
@@ -90,4 +104,4 @@ Hace falta JDK 25. Gradle descarga esa versión si el sistema usa otra.
 .\gradlew.bat build
 ```
 
-El jar queda en `build/libs/Dreamers-Triggers-1.6.6.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3. Quita `CommandBlocker` de esa carpeta: este plugin ya bloquea los comandos.
+El jar queda en `build/libs/Dreamers-Triggers-1.6.7.jar`. Cópialo a la carpeta `plugins` de un servidor Paper 26.3. Quita `CommandBlocker` de esa carpeta: este plugin ya bloquea los comandos.

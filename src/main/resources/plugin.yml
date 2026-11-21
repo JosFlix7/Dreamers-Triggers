@@ -1,5 +1,5 @@
 name: DreamersTriggers
-version: '1.6.6'
+version: '1.7.0'
 author: JosFlix7
 main: dev.dreamers.DreamersPlugin
 api-version: '26.3'
@@ -8,13 +8,16 @@ description: Dreamers Triggers
 commands:
   dreamers:
     description: Configura Dreamers Triggers
-    usage: /dreamers armor <true|false>
+    usage: /dreamers armor <true|false> | /dreamers scoreboard_info | /dreamers viewdistance <jugador|@a> <2-32|reset> | /dreamers unclaim | /dreamers trust <jugador|public> | /dreamers inventory <jugador> | /dreamers enderchest <jugador>
 permissions:
   dreamers.deathuhc:
     description: Activa el modo UHC cuando muere un jugador y recarga la configuración
     default: op
   dreamers.give:
     description: Dar los objetos custom. Solo la consola y los operadores pueden usarlo
+    default: op
+  dreamers.claims.admin:
+    description: Crear terrenos de administración y borrar el terreno en el que se está
     default: op
   dreamers.commands.bypass:
     description: Usar y ver en el tabulador cualquier comando
