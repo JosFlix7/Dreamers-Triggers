@@ -68,7 +68,6 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.loot.LootContext;
 import org.bukkit.loot.LootTable;
 import org.bukkit.loot.Lootable;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -79,6 +78,9 @@ import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,7 +91,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Cofres, barriles y vagonetas con tabla de botín se abren con un inventario por jugador.
+ * Cofres, cofres de cobre, barriles y vagonetas con tabla de botín se abren con un inventario por jugador.
  * La tabla se queda en el contenedor y cada jugador guarda su copia ahí mismo.
  */
 final class PersonalLoot implements Listener {
@@ -108,6 +110,7 @@ final class PersonalLoot implements Listener {
     private final Set<UUID> removing = new HashSet<>();
     private final Set<StorageMinecart> frozen = new HashSet<>();
     private final Set<NamespacedKey> warned = new HashSet<>();
+    private VanillaChestLoot chestLoot;
 
     private boolean enabled = true;
     private boolean restricted = true;
@@ -467,7 +470,7 @@ final class PersonalLoot implements Listener {
             parts.add(new Part(isLootChest(half), offset, HALF, half, null));
             offset += HALF;
         }
-        Component title = Component.translatable(block.getType() == Material.BARREL ? "container.barrel" : "container.chest");
+        Component title = containerTitle(block.getType());
         show(player, parts, offset, title, anchor, null, halves);
     }
 
@@ -523,13 +526,21 @@ final class PersonalLoot implements Listener {
         UUID id = player.getUniqueId();
         ItemStack[] saved = read(data, id);
         int count = data.getOrDefault(refillsKey(id), PersistentDataType.INTEGER, 0);
-        if (saved != null && !due(data, id, saved, count)) {
+        int version = data.getOrDefault(versionKey(id), PersistentDataType.INTEGER, 0);
+        // Una generación fallida dejó el inventario vacío y lo guardó. Esas copias se vuelven a tirar una vez.
+        boolean retryEmpty = saved != null && empty(saved) && version < 1 && genericTable(table);
+        if (saved != null && !retryEmpty && !due(data, id, saved, count)) {
             return saved;
         }
         ItemStack[] generated = generate(origin, player, table);
+        if (generated == null) {
+            return blank();
+        }
         writeItems(data, id, generated);
+        data.set(versionKey(id), PersistentDataType.INTEGER, 1);
         if (replenish) {
-            writeRefill(data, id, saved == null ? 0 : count >= Integer.MAX_VALUE ? count : count + 1);
+            boolean first = saved == null || retryEmpty;
+            writeRefill(data, id, first ? 0 : count >= Integer.MAX_VALUE ? count : count + 1);
         }
         return generated;
     }
@@ -558,9 +569,8 @@ final class PersonalLoot implements Listener {
     }
 
     private ItemStack[] generate(Location origin, Player player, LootTable table) {
-        ItemStack[] items = blank();
-        if (table == null) {
-            return items;
+        if (table == null || origin.getWorld() == null) {
+            return blank();
         }
         try {
             Inventory temp = plugin.getServer().createInventory(null, HALF);
@@ -569,16 +579,46 @@ final class PersonalLoot implements Listener {
             if (attribute != null) {
                 luck = (float) attribute.getValue();
             }
-            table.fillInventory(temp, ThreadLocalRandom.current(), new LootContext.Builder(origin).luck(luck).build());
+            // El tipo genérico, el que queda cuando la tabla no trae "type", exige todos los parámetros.
+            // Un cofre de vanilla solo usa el conjunto chest: origen y, si cabe, el jugador.
+            chestLoot().fill(temp, origin, player, luck, table);
+            ItemStack[] items = blank();
             for (int slot = 0; slot < HALF; slot++) {
                 items[slot] = copy(temp.getItem(slot));
             }
-        } catch (RuntimeException exception) {
+            return items;
+        } catch (RuntimeException | ReflectiveOperationException exception) {
             if (warned.add(table.getKey())) {
-                plugin.getLogger().warning("No se pudo generar el botín " + table.getKey() + ": " + exception.getMessage());
+                Throwable cause = exception instanceof InvocationTargetException wrapped && wrapped.getCause() != null
+                        ? wrapped.getCause() : exception;
+                String message = cause.getMessage();
+                if (message == null || message.isBlank()) {
+                    message = cause.getClass().getSimpleName();
+                }
+                plugin.getLogger().warning("No se pudo generar el botín " + table.getKey() + ": " + message);
             }
+            return null;
         }
-        return items;
+    }
+
+    private boolean genericTable(LootTable table) {
+        if (table == null) {
+            return false;
+        }
+        try {
+            return chestLoot().generic(table);
+        } catch (ReflectiveOperationException exception) {
+            return false;
+        }
+    }
+
+    private VanillaChestLoot chestLoot() throws ReflectiveOperationException {
+        VanillaChestLoot loaded = chestLoot;
+        if (loaded == null) {
+            loaded = VanillaChestLoot.load();
+            chestLoot = loaded;
+        }
+        return loaded;
     }
 
     private void finish(Player player, Inventory inventory) {
@@ -722,9 +762,7 @@ final class PersonalLoot implements Listener {
             }
             return;
         }
-        play(center(block), block.getType() == Material.BARREL
-                ? (open ? Sound.BLOCK_BARREL_OPEN : Sound.BLOCK_BARREL_CLOSE)
-                : (open ? Sound.BLOCK_CHEST_OPEN : Sound.BLOCK_CHEST_CLOSE));
+        play(center(block), lidSound(block.getType(), open));
     }
 
     private void away(Player player) {
@@ -1055,7 +1093,42 @@ final class PersonalLoot implements Listener {
     }
 
     private static boolean container(Material type) {
-        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL;
+        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.BARREL || copperChest(type);
+    }
+
+    private static boolean copperChest(Material type) {
+        return switch (type) {
+            case COPPER_CHEST, EXPOSED_COPPER_CHEST, WEATHERED_COPPER_CHEST, OXIDIZED_COPPER_CHEST,
+                    WAXED_COPPER_CHEST, WAXED_EXPOSED_COPPER_CHEST, WAXED_WEATHERED_COPPER_CHEST,
+                    WAXED_OXIDIZED_COPPER_CHEST -> true;
+            default -> false;
+        };
+    }
+
+    private static Component containerTitle(Material type) {
+        if (type == Material.BARREL) {
+            return Component.translatable("container.barrel");
+        }
+        if (copperChest(type)) {
+            return Component.translatable("container.copper_chest");
+        }
+        return Component.translatable("container.chest");
+    }
+
+    private static Sound lidSound(Material type, boolean open) {
+        if (type == Material.BARREL) {
+            return open ? Sound.BLOCK_BARREL_OPEN : Sound.BLOCK_BARREL_CLOSE;
+        }
+        if (type == Material.OXIDIZED_COPPER_CHEST || type == Material.WAXED_OXIDIZED_COPPER_CHEST) {
+            return open ? Sound.BLOCK_COPPER_CHEST_OXIDIZED_OPEN : Sound.BLOCK_COPPER_CHEST_OXIDIZED_CLOSE;
+        }
+        if (type == Material.WEATHERED_COPPER_CHEST || type == Material.WAXED_WEATHERED_COPPER_CHEST) {
+            return open ? Sound.BLOCK_COPPER_CHEST_WEATHERED_OPEN : Sound.BLOCK_COPPER_CHEST_WEATHERED_CLOSE;
+        }
+        if (copperChest(type)) {
+            return open ? Sound.BLOCK_COPPER_CHEST_OPEN : Sound.BLOCK_COPPER_CHEST_CLOSE;
+        }
+        return open ? Sound.BLOCK_CHEST_OPEN : Sound.BLOCK_CHEST_CLOSE;
     }
 
     private Session session(HumanEntity entity, InventoryView view) {
@@ -1092,6 +1165,10 @@ final class PersonalLoot implements Listener {
 
     private NamespacedKey itemsKey(UUID id) {
         return new NamespacedKey(plugin, id.toString());
+    }
+
+    private NamespacedKey versionKey(UUID id) {
+        return new NamespacedKey(plugin, id + "_v");
     }
 
     private NamespacedKey refillAtKey(UUID id) {
@@ -1140,6 +1217,121 @@ final class PersonalLoot implements Listener {
     }
 
     private record Part(boolean personal, int offset, int size, Block block, StorageMinecart minecart) {
+    }
+
+    /**
+     * Tira el botín con el conjunto de parámetros de un cofre, que es el que usa el juego al abrirlo.
+     * {@code LootTable.fillInventory} usa el conjunto de la propia tabla y falla si esa tabla no trae tipo.
+     */
+    private static final class VanillaChestLoot {
+        private final Method getHandle;
+        private final Method getParamSet;
+        private final Method withLuck;
+        private final Method withParameter;
+        private final Method withOptionalParameter;
+        private final Method create;
+        private final Method fill;
+        private final Method inventory;
+        private final Method randomCreate;
+        private final Constructor<?> builder;
+        private final Constructor<?> vec;
+        private final Object originKey;
+        private final Object entityKey;
+        private final Object chestSet;
+        private final Object allParams;
+        private final Object defaultSet;
+
+        private VanillaChestLoot(
+                Method getHandle,
+                Method getParamSet,
+                Method withLuck,
+                Method withParameter,
+                Method withOptionalParameter,
+                Method create,
+                Method fill,
+                Method inventory,
+                Method randomCreate,
+                Constructor<?> builder,
+                Constructor<?> vec,
+                Object originKey,
+                Object entityKey,
+                Object chestSet,
+                Object allParams,
+                Object defaultSet) {
+            this.getHandle = getHandle;
+            this.getParamSet = getParamSet;
+            this.withLuck = withLuck;
+            this.withParameter = withParameter;
+            this.withOptionalParameter = withOptionalParameter;
+            this.create = create;
+            this.fill = fill;
+            this.inventory = inventory;
+            this.randomCreate = randomCreate;
+            this.builder = builder;
+            this.vec = vec;
+            this.originKey = originKey;
+            this.entityKey = entityKey;
+            this.chestSet = chestSet;
+            this.allParams = allParams;
+            this.defaultSet = defaultSet;
+        }
+
+        static VanillaChestLoot load() throws ReflectiveOperationException {
+            Class<?> lootTable = Class.forName("net.minecraft.world.level.storage.loot.LootTable");
+            Class<?> paramsBuilder = Class.forName("net.minecraft.world.level.storage.loot.LootParams$Builder");
+            Class<?> serverLevel = Class.forName("net.minecraft.server.level.ServerLevel");
+            Class<?> contextKey = Class.forName("net.minecraft.util.context.ContextKey");
+            Class<?> keySet = Class.forName("net.minecraft.util.context.ContextKeySet");
+            Class<?> vec3 = Class.forName("net.minecraft.world.phys.Vec3");
+            Class<?> params = Class.forName("net.minecraft.world.level.storage.loot.parameters.LootContextParams");
+            Class<?> sets = Class.forName("net.minecraft.world.level.storage.loot.parameters.LootContextParamSets");
+            Class<?> randomSource = Class.forName("net.minecraft.util.RandomSource");
+            Method fill = null;
+            for (Method method : lootTable.getMethods()) {
+                if ("fill".equals(method.getName()) && method.getParameterCount() == 4) {
+                    fill = method;
+                    break;
+                }
+            }
+            if (fill == null) {
+                throw new NoSuchMethodException("LootTable.fill");
+            }
+            return new VanillaChestLoot(
+                    Class.forName("org.bukkit.craftbukkit.CraftLootTable").getMethod("getHandle"),
+                    lootTable.getMethod("getParamSet"),
+                    paramsBuilder.getMethod("withLuck", float.class),
+                    paramsBuilder.getMethod("withParameter", contextKey, Object.class),
+                    paramsBuilder.getMethod("withOptionalParameter", contextKey, Object.class),
+                    paramsBuilder.getMethod("create", keySet),
+                    fill,
+                    Class.forName("org.bukkit.craftbukkit.inventory.CraftInventory").getMethod("getInventory"),
+                    randomSource.getMethod("create", long.class),
+                    paramsBuilder.getConstructor(serverLevel),
+                    vec3.getConstructor(double.class, double.class, double.class),
+                    params.getField("ORIGIN").get(null),
+                    params.getField("THIS_ENTITY").get(null),
+                    sets.getField("CHEST").get(null),
+                    sets.getField("ALL_PARAMS").get(null),
+                    lootTable.getField("DEFAULT_PARAM_SET").get(null));
+        }
+
+        boolean generic(LootTable table) throws ReflectiveOperationException {
+            Object set = getParamSet.invoke(getHandle.invoke(table));
+            return allParams.equals(set) || defaultSet.equals(set);
+        }
+
+        void fill(Inventory target, Location origin, Player player, float luck, LootTable table) throws ReflectiveOperationException {
+            Object handle = getHandle.invoke(table);
+            Object level = origin.getWorld().getClass().getMethod("getHandle").invoke(origin.getWorld());
+            Object params = builder.newInstance(level);
+            params = withLuck.invoke(params, luck);
+            params = withParameter.invoke(params, originKey, vec.newInstance(origin.getX(), origin.getY(), origin.getZ()));
+            Object nmsPlayer = player.getClass().getMethod("getHandle").invoke(player);
+            params = withOptionalParameter.invoke(params, entityKey, nmsPlayer);
+            params = create.invoke(params, chestSet);
+            Object random = randomCreate.invoke(null, ThreadLocalRandom.current().nextLong());
+            fill.invoke(handle, inventory.invoke(target), params, random, true);
+        }
     }
 
     private static final class LootView implements InventoryHolder {

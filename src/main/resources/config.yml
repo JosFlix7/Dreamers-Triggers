@@ -51,7 +51,7 @@ xaero:
 viewdistance:
   players: {}
 
-# Botín único. Cofres, cofres trampa, barriles y vagonetas con cofre que aún tienen tabla de botín
+# Botín único. Cofres, cofres de cobre, cofres trampa, barriles y vagonetas con cofre que aún tienen tabla de botín
 # se abren con un inventario por jugador. La tabla se queda en el contenedor.
 # destroying.restricted: solo un jugador en creativo puede romperlos.
 # destroying.confirmation: ese jugador confirma antes de romperlos.
