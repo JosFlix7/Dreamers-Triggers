@@ -33,8 +33,10 @@ import org.bukkit.scoreboard.Team;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -91,6 +93,16 @@ final class TabBoard implements Listener {
     private final Set<UUID> hidden = new HashSet<>();
     private final Set<UUID> healthSoon = new HashSet<>();
     private final Set<BukkitTask> followUps = new HashSet<>();
+    private Method boardHandle;
+    private Method objectiveByName;
+    private Method listScores;
+    private Method scoreOwner;
+    private Method scoreValue;
+    private boolean scoresReady;
+    private boolean scoresFast = true;
+    private int listedTick = Integer.MIN_VALUE;
+    private String listedObjective = "";
+    private Collection<ListedScore> listedCache = List.of();
     private Map<String, User> users = Map.of();
     private List<Group> groups = List.of();
     private Design fallback = new Design(DEFAULT_HEADER, DEFAULT_FOOTER);
@@ -664,6 +676,23 @@ final class TabBoard implements Listener {
 
     private void copyScores(UUID id, Objective source, Objective mirror) {
         Set<String> next = new HashSet<>();
+        Collection<ListedScore> listed = listedScores(source);
+        if (listed == null) {
+            copyScoresFromBoard(id, source, mirror);
+            return;
+        }
+        for (ListedScore listedScore : listed) {
+            next.add(listedScore.entry());
+            Score copy = mirror.getScore(listedScore.entry());
+            if (!copy.isScoreSet() || copy.getScore() != listedScore.value()) {
+                copy.setScore(listedScore.value());
+            }
+        }
+        forgetMissing(id, mirror, next);
+    }
+
+    private void copyScoresFromBoard(UUID id, Objective source, Objective mirror) {
+        Set<String> next = new HashSet<>();
         Scoreboard main = source.getScoreboard();
         for (String entry : List.copyOf(main.getEntries())) {
             Score score = scoreOf(main, source, entry);
@@ -677,6 +706,10 @@ final class TabBoard implements Listener {
                 copy.setScore(value);
             }
         }
+        forgetMissing(id, mirror, next);
+    }
+
+    private void forgetMissing(UUID id, Objective mirror, Set<String> next) {
         Set<String> previous = listEntries.computeIfAbsent(id, ignored -> new HashSet<>());
         for (String entry : List.copyOf(previous)) {
             if (next.contains(entry)) {
@@ -689,6 +722,61 @@ final class TabBoard implements Listener {
         }
         previous.clear();
         previous.addAll(next);
+    }
+
+    private Collection<ListedScore> listedScores(Objective source) {
+        if (!scoresFast) {
+            return null;
+        }
+        int tick = plugin.getServer().getCurrentTick();
+        String name = source.getName();
+        if (listedTick == tick && name.equals(listedObjective)) {
+            return listedCache;
+        }
+        try {
+            if (!scoresReady) {
+                bindListedScores();
+                scoresReady = true;
+            }
+            Object board = boardHandle.invoke(source.getScoreboard());
+            Object objective = objectiveByName.invoke(board, name);
+            Collection<ListedScore> out = List.of();
+            if (objective != null) {
+                Collection<?> found = (Collection<?>) listScores.invoke(board, objective);
+                List<ListedScore> scores = new ArrayList<>(found.size());
+                for (Object entry : found) {
+                    String owner = (String) scoreOwner.invoke(entry);
+                    if (owner == null) {
+                        continue;
+                    }
+                    scores.add(new ListedScore(owner, (Integer) scoreValue.invoke(entry)));
+                }
+                out = scores;
+            }
+            listedTick = tick;
+            listedObjective = name;
+            listedCache = out;
+            return out;
+        } catch (ReflectiveOperationException exception) {
+            scoresFast = false;
+            plugin.getLogger().warning(
+                    "No se pudieron leer las puntuaciones de la lista sin recorrer el tablero: "
+                            + exception.getMessage()
+            );
+            return null;
+        }
+    }
+
+    private void bindListedScores() throws ReflectiveOperationException {
+        Class<?> craftBoard = Class.forName("org.bukkit.craftbukkit.scoreboard.CraftScoreboard");
+        boardHandle = craftBoard.getMethod("getHandle");
+        Class<?> nmsBoard = boardHandle.getReturnType();
+        objectiveByName = nmsBoard.getMethod("getObjective", String.class);
+        Class<?> nmsObjective = Class.forName("net.minecraft.world.scores.Objective");
+        listScores = nmsBoard.getMethod("listPlayerScores", nmsObjective);
+        Class<?> entry = Class.forName("net.minecraft.world.scores.PlayerScoreEntry");
+        scoreOwner = entry.getMethod("owner");
+        scoreValue = entry.getMethod("value");
     }
 
     private static Score scoreOf(Scoreboard board, Objective objective, String entry) {
@@ -860,6 +948,9 @@ final class TabBoard implements Listener {
     private Component sessionMessage(String format, Player player) {
         String text = placeholders.apply(format, player);
         return text.isEmpty() ? Component.empty() : Placeholders.LEGACY.deserialize(text);
+    }
+
+    private record ListedScore(String entry, int value) {
     }
 
     private record User(String tabPrefix, String tagPrefix, String tabSuffix, String tagSuffix) {
