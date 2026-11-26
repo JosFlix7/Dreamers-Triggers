@@ -87,6 +87,7 @@ final class TabBoard implements Listener {
     private final Map<UUID, String> tabCache = new HashMap<>();
     private final Map<UUID, String> headerCache = new HashMap<>();
     private final Map<UUID, Integer> lineCounts = new HashMap<>();
+    private final Map<UUID, String> sidebarCache = new HashMap<>();
     private final Map<UUID, Map<UUID, String>> belowState = new HashMap<>();
     private final Map<UUID, String> listNames = new HashMap<>();
     private final Map<UUID, Set<String>> listEntries = new HashMap<>();
@@ -122,7 +123,7 @@ final class TabBoard implements Listener {
 
     TabBoard(JavaPlugin plugin, Claims claims) {
         this.plugin = plugin;
-        this.placeholders = new Placeholders(claims);
+        this.placeholders = new Placeholders(plugin, claims);
     }
 
     void enable() {
@@ -352,6 +353,7 @@ final class TabBoard implements Listener {
         tabCache.clear();
         headerCache.clear();
         lineCounts.clear();
+        sidebarCache.clear();
         belowState.clear();
     }
 
@@ -459,23 +461,35 @@ final class TabBoard implements Listener {
         if (side == null) {
             return;
         }
-        side.displayName(Placeholders.LEGACY.deserialize(placeholders.apply(scoreTitle, player)));
+        String title = placeholders.apply(scoreTitle, player);
+        StringBuilder signature = new StringBuilder(title);
+        signature.append('\0');
+        String[] lines = new String[scoreLines.size()];
         for (int i = 0; i < scoreLines.size(); i++) {
-            String resolved = placeholders.apply(scoreLines.get(i), player);
-            Score score = side.getScore(lineEntry(i));
-            score.setScore(scoreLines.size() - i);
-            score.customName(resolved.isEmpty() ? Component.space() : Placeholders.LEGACY.deserialize(resolved));
-            score.numberFormat(NumberFormat.blank());
+            lines[i] = placeholders.apply(scoreLines.get(i), player);
+            signature.append(lines[i]).append('\n');
         }
-        Integer previous = lineCounts.get(player.getUniqueId());
-        int old = previous == null ? 0 : previous;
-        for (int i = scoreLines.size(); i < old; i++) {
-            Score extra = side.getScore(lineEntry(i));
-            if (extra.isScoreSet()) {
-                extra.resetScore();
+        String rendered = signature.toString();
+        if (!rendered.equals(sidebarCache.get(player.getUniqueId()))) {
+            sidebarCache.put(player.getUniqueId(), rendered);
+            side.displayName(Placeholders.LEGACY.deserialize(title));
+            for (int i = 0; i < lines.length; i++) {
+                String resolved = lines[i];
+                Score score = side.getScore(lineEntry(i));
+                score.setScore(lines.length - i);
+                score.customName(resolved.isEmpty() ? Component.space() : Placeholders.LEGACY.deserialize(resolved));
+                score.numberFormat(NumberFormat.blank());
             }
+            Integer previous = lineCounts.get(player.getUniqueId());
+            int old = previous == null ? 0 : previous;
+            for (int i = lines.length; i < old; i++) {
+                Score extra = side.getScore(lineEntry(i));
+                if (extra.isScoreSet()) {
+                    extra.resetScore();
+                }
+            }
+            lineCounts.put(player.getUniqueId(), lines.length);
         }
-        lineCounts.put(player.getUniqueId(), scoreLines.size());
         if (hidden.contains(player.getUniqueId())) {
             if (side.getDisplaySlot() == DisplaySlot.SIDEBAR) {
                 board.clearSlot(DisplaySlot.SIDEBAR);
@@ -867,6 +881,7 @@ final class TabBoard implements Listener {
         tabCache.remove(id);
         headerCache.remove(id);
         lineCounts.remove(id);
+        sidebarCache.remove(id);
         belowState.remove(id);
         listNames.remove(id);
         listEntries.remove(id);

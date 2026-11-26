@@ -6,11 +6,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRegisterChannelEvent;
+import org.bukkit.event.player.PlayerUnregisterChannelEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +33,7 @@ final class AppleSkinSync implements Listener {
     private final Map<UUID, Float> saturation = new HashMap<>();
     private final Map<UUID, Float> exhaustion = new HashMap<>();
     private final Map<UUID, Boolean> regeneration = new HashMap<>();
+    private final Set<UUID> listening = new HashSet<>();
     private BukkitTask task;
 
     AppleSkinSync(JavaPlugin plugin) {
@@ -41,7 +46,12 @@ final class AppleSkinSync implements Listener {
         messenger.registerOutgoingPluginChannel(plugin, EXHAUSTION);
         messenger.registerOutgoingPluginChannel(plugin, REGENERATION);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            if (subscribed(player)) {
+                listening.add(player.getUniqueId());
+            }
+        }
+        arm();
     }
 
     void disable() {
@@ -52,6 +62,7 @@ final class AppleSkinSync implements Listener {
         saturation.clear();
         exhaustion.clear();
         regeneration.clear();
+        listening.clear();
         var messenger = plugin.getServer().getMessenger();
         messenger.unregisterOutgoingPluginChannel(plugin, SATURATION);
         messenger.unregisterOutgoingPluginChannel(plugin, EXHAUSTION);
@@ -60,23 +71,91 @@ final class AppleSkinSync implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        forget(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        forget(player.getUniqueId());
+        if (subscribed(player)) {
+            listening.add(player.getUniqueId());
+            arm();
+        }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        forget(event.getPlayer().getUniqueId());
+        UUID id = event.getPlayer().getUniqueId();
+        listening.remove(id);
+        forget(id);
+        disarm();
+    }
+
+    @EventHandler
+    public void onRegister(PlayerRegisterChannelEvent event) {
+        if (watched(event.getChannel())) {
+            listening.add(event.getPlayer().getUniqueId());
+            arm();
+        }
+    }
+
+    @EventHandler
+    public void onUnregister(PlayerUnregisterChannelEvent event) {
+        if (!watched(event.getChannel())) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (!subscribed(player)) {
+            UUID id = player.getUniqueId();
+            listening.remove(id);
+            forget(id);
+            disarm();
+        }
     }
 
     private void tick() {
-        for (Player player : plugin.getServer().getOnlinePlayers()) {
+        if (listening.isEmpty()) {
+            disarm();
+            return;
+        }
+        for (UUID id : List.copyOf(listening)) {
+            Player player = plugin.getServer().getPlayer(id);
+            if (player == null) {
+                listening.remove(id);
+                forget(id);
+                continue;
+            }
             sync(player);
         }
+        disarm();
+    }
+
+    private void arm() {
+        if (task == null && !listening.isEmpty()) {
+            task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        }
+    }
+
+    private void disarm() {
+        if (listening.isEmpty() && task != null) {
+            task.cancel();
+            task = null;
+        }
+    }
+
+    private static boolean watched(String channel) {
+        return SATURATION.equals(channel) || EXHAUSTION.equals(channel) || REGENERATION.equals(channel);
+    }
+
+    private static boolean subscribed(Player player) {
+        Set<String> channels = player.getListeningPluginChannels();
+        return channels.contains(SATURATION) || channels.contains(EXHAUSTION) || channels.contains(REGENERATION);
     }
 
     private void sync(Player player) {
         UUID id = player.getUniqueId();
         Set<String> channels = player.getListeningPluginChannels();
+        if (!channels.contains(SATURATION) && !channels.contains(EXHAUSTION) && !channels.contains(REGENERATION)) {
+            listening.remove(id);
+            forget(id);
+            return;
+        }
         float nextSaturation = player.getSaturation();
         if (channels.contains(SATURATION)) {
             Float previous = saturation.get(id);

@@ -1240,6 +1240,8 @@ final class PersonalLoot implements Listener {
         private final Object chestSet;
         private final Object allParams;
         private final Object defaultSet;
+        private Method worldHandle;
+        private Method playerHandle;
 
         private VanillaChestLoot(
                 Method getHandle,
@@ -1315,6 +1317,24 @@ final class PersonalLoot implements Listener {
                     lootTable.getField("DEFAULT_PARAM_SET").get(null));
         }
 
+        private Method worldHandle() throws ReflectiveOperationException {
+            Method cached = worldHandle;
+            if (cached == null) {
+                cached = Class.forName("org.bukkit.craftbukkit.CraftWorld").getMethod("getHandle");
+                worldHandle = cached;
+            }
+            return cached;
+        }
+
+        private Method playerHandle() throws ReflectiveOperationException {
+            Method cached = playerHandle;
+            if (cached == null) {
+                cached = Class.forName("org.bukkit.craftbukkit.entity.CraftPlayer").getMethod("getHandle");
+                playerHandle = cached;
+            }
+            return cached;
+        }
+
         boolean generic(LootTable table) throws ReflectiveOperationException {
             Object set = getParamSet.invoke(getHandle.invoke(table));
             return allParams.equals(set) || defaultSet.equals(set);
@@ -1322,11 +1342,11 @@ final class PersonalLoot implements Listener {
 
         void fill(Inventory target, Location origin, Player player, float luck, LootTable table) throws ReflectiveOperationException {
             Object handle = getHandle.invoke(table);
-            Object level = origin.getWorld().getClass().getMethod("getHandle").invoke(origin.getWorld());
+            Object level = worldHandle().invoke(origin.getWorld());
             Object params = builder.newInstance(level);
             params = withLuck.invoke(params, luck);
             params = withParameter.invoke(params, originKey, vec.newInstance(origin.getX(), origin.getY(), origin.getZ()));
-            Object nmsPlayer = player.getClass().getMethod("getHandle").invoke(player);
+            Object nmsPlayer = playerHandle().invoke(player);
             params = withOptionalParameter.invoke(params, entityKey, nmsPlayer);
             params = create.invoke(params, chestSet);
             Object random = randomCreate.invoke(null, ThreadLocalRandom.current().nextLong());

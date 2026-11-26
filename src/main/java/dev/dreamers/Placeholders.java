@@ -17,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.Objective;
@@ -25,6 +26,7 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
 
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.time.DateTimeException;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -33,6 +35,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +76,7 @@ final class Placeholders {
             BlockFace.NORTH_WEST
     };
 
+    private final JavaPlugin plugin;
     private final Claims claims;
     private final ZoneId zone = ZoneId.systemDefault();
     private final Locale timeLocale = Locale.getDefault();
@@ -80,14 +84,22 @@ final class Placeholders {
     private final Set<String> badFormats = new HashSet<>();
     private final Runtime runtime = Runtime.getRuntime();
     private Objective rankedObjective;
-    private List<Score> rankedScores = List.of();
+    private List<Ranked> rankedScores = List.of();
     private int rankedTick = Integer.MIN_VALUE;
+    private Method boardHandle;
+    private Method objectiveByName;
+    private Method listScores;
+    private Method scoreOwner;
+    private Method scoreValue;
+    private boolean scoresReady;
+    private boolean scoresFast = true;
     private long worldCountsAt;
     private int cachedChunks;
     private int cachedLiving;
     private int cachedEntities;
 
-    Placeholders(Claims claims) {
+    Placeholders(JavaPlugin plugin, Claims claims) {
+        this.plugin = plugin;
         this.claims = claims;
     }
 
@@ -487,13 +499,13 @@ final class Placeholders {
         if (objective == null) {
             return unknownObjective(objectiveName.text());
         }
-        List<Score> scores = ranking(objective);
+        List<Ranked> scores = ranking(objective);
         if (scores.isEmpty()) {
             return score ? "0" : "";
         }
         int index = rank >= 1 && rank <= scores.size() ? rank - 1 : 0;
-        Score chosen = scores.get(index);
-        return score ? Integer.toString(chosen.getScore()) : chosen.getEntry();
+        Ranked chosen = scores.get(index);
+        return score ? Integer.toString(chosen.value()) : chosen.entry();
     }
 
     private String readScore(String objectiveName, String entry, Player viewer) {
@@ -521,17 +533,22 @@ final class Placeholders {
     }
 
     private int entryScore(Objective objective, String wanted) {
-        Score exact = objective.getScore(wanted);
-        if (exact.isScoreSet()) {
-            return exact.getScore();
-        }
+        Integer exact = null;
         int best = 0;
-        for (Score score : ranking(objective)) {
-            if (sameEntry(score.getEntry(), wanted)) {
-                best = Math.max(best, score.getScore());
+        boolean loose = false;
+        for (Ranked score : ranking(objective)) {
+            String tracked = score.entry();
+            if (wanted.equals(tracked)) {
+                exact = score.value();
+            } else if (sameEntry(tracked, wanted)) {
+                best = Math.max(best, score.value());
+                loose = true;
             }
         }
-        return best;
+        if (exact != null) {
+            return exact;
+        }
+        return loose ? best : 0;
     }
 
     private static boolean deathCount(Objective objective) {
@@ -641,23 +658,86 @@ final class Placeholders {
         return null;
     }
 
-    private List<Score> ranking(Objective objective) {
+    private List<Ranked> ranking(Objective objective) {
         int tick = Bukkit.getCurrentTick();
         if (objective.equals(rankedObjective) && tick == rankedTick) {
             return rankedScores;
         }
-        Scoreboard board = objective.getScoreboard();
-        List<Score> scores = new ArrayList<>();
-        for (String entry : board.getEntries()) {
-            Score score = objective.getScore(entry);
-            if (score.isScoreSet()) {
-                scores.add(score);
-            }
+        List<Ranked> scores = listed(objective);
+        if (scores == null) {
+            scores = rankingFromBoard(objective);
         }
-        scores.sort(Comparator.comparingInt(Score::getScore).reversed().thenComparing(Score::getEntry));
+        scores.sort(Comparator.comparingInt(Ranked::value).reversed().thenComparing(Ranked::entry));
         rankedObjective = objective;
         rankedScores = scores;
         rankedTick = tick;
+        return scores;
+    }
+
+    private List<Ranked> listed(Objective objective) {
+        Scoreboard scoreboard = objective.getScoreboard();
+        if (scoreboard == null) {
+            return new ArrayList<>();
+        }
+        if (!scoresFast) {
+            return null;
+        }
+        try {
+            if (!scoresReady) {
+                bindScores();
+                scoresReady = true;
+            }
+            Object board = boardHandle.invoke(scoreboard);
+            Object nmsObjective = objectiveByName.invoke(board, objective.getName());
+            if (nmsObjective == null) {
+                return new ArrayList<>();
+            }
+            Collection<?> found = (Collection<?>) listScores.invoke(board, nmsObjective);
+            List<Ranked> scores = new ArrayList<>(found.size());
+            for (Object entry : found) {
+                String owner = (String) scoreOwner.invoke(entry);
+                Object raw = scoreValue.invoke(entry);
+                if (owner == null || !(raw instanceof Integer value)) {
+                    continue;
+                }
+                scores.add(new Ranked(owner, value));
+            }
+            return scores;
+        } catch (ReflectiveOperationException exception) {
+            scoresFast = false;
+            plugin.getLogger().warning(
+                    "No se pudieron leer las puntuaciones de un objetivo sin recorrer el tablero: "
+                            + exception.getMessage()
+            );
+            return null;
+        }
+    }
+
+    private void bindScores() throws ReflectiveOperationException {
+        Class<?> craftBoard = Class.forName("org.bukkit.craftbukkit.scoreboard.CraftScoreboard");
+        boardHandle = craftBoard.getMethod("getHandle");
+        Class<?> nmsBoard = boardHandle.getReturnType();
+        objectiveByName = nmsBoard.getMethod("getObjective", String.class);
+        Class<?> nmsObjective = Class.forName("net.minecraft.world.scores.Objective");
+        listScores = nmsBoard.getMethod("listPlayerScores", nmsObjective);
+        Class<?> entry = Class.forName("net.minecraft.world.scores.PlayerScoreEntry");
+        scoreOwner = entry.getMethod("owner");
+        scoreValue = entry.getMethod("value");
+    }
+
+    private static List<Ranked> rankingFromBoard(Objective objective) {
+        Scoreboard board = objective.getScoreboard();
+        List<Ranked> scores = new ArrayList<>();
+        if (board == null) {
+            return scores;
+        }
+        for (String entry : board.getEntries()) {
+            Score score = objective.getScore(entry);
+            if (!score.isScoreSet() || score.getEntry() == null) {
+                continue;
+            }
+            scores.add(new Ranked(score.getEntry(), score.getScore()));
+        }
         return scores;
     }
 
@@ -1141,6 +1221,9 @@ final class Placeholders {
             return (level * 5) - 38;
         }
         return (level * 9) - 158;
+    }
+
+    private record Ranked(String entry, int value) {
     }
 
     private record Piece(String text, int end) {

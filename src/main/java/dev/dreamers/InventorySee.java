@@ -66,7 +66,6 @@ final class InventorySee implements Listener {
 
     void enable() {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
 
     void shutdown() {
@@ -177,6 +176,7 @@ final class InventorySee implements Listener {
         viewer.openInventory(session.inventory);
         syncPersonal(session);
         pull(session);
+        arm();
     }
 
     private void tick() {
@@ -208,24 +208,33 @@ final class InventorySee implements Listener {
                 pull(session);
             }
         }
-        if (stores.isEmpty()) {
-            return;
+        if (!stores.isEmpty()) {
+            int now = Bukkit.getCurrentTick();
+            stores.entrySet().removeIf(entry -> {
+                if (watching(entry.getKey()) || now <= entry.getValue().offlineTick || now < entry.getValue().nextWrite) {
+                    return false;
+                }
+                Store store = entry.getValue();
+                if (Bukkit.getPlayer(store.id) != null) {
+                    return false;
+                }
+                if (files.write(store.id, store.name, store.items)) {
+                    return true;
+                }
+                store.nextWrite = now + 20;
+                return false;
+            });
         }
-        int now = Bukkit.getCurrentTick();
-        stores.entrySet().removeIf(entry -> {
-            if (watching(entry.getKey()) || now <= entry.getValue().offlineTick || now < entry.getValue().nextWrite) {
-                return false;
-            }
-            Store store = entry.getValue();
-            if (Bukkit.getPlayer(store.id) != null) {
-                return false;
-            }
-            if (files.write(store.id, store.name, store.items)) {
-                return true;
-            }
-            store.nextWrite = now + 20;
-            return false;
-        });
+        if (sessions.isEmpty() && stores.isEmpty() && task != null) {
+            task.cancel();
+            task = null;
+        }
+    }
+
+    private void arm() {
+        if (task == null) {
+            task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -330,6 +339,7 @@ final class InventorySee implements Listener {
             copy(player, store.items);
         }
         store.offlineTick = Bukkit.getCurrentTick();
+        arm();
         for (Session session : open) {
             session.store = store;
             retitle(session);
